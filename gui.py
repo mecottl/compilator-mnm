@@ -213,7 +213,6 @@ class CompiladorGUI:
         # Crear todas las pestañas
         self.create_errors_tab()
         self.create_tokens_tab()
-        self.create_symbols_tab()
         self.create_output_tab()
         
     def create_errors_tab(self):
@@ -226,24 +225,24 @@ class CompiladorGUI:
         errors_frame.columnconfigure(0, weight=1)
         
         # Etiqueta
-        error_label = ttk.Label(errors_frame, text="Errores encontrados:", 
+        error_label = ttk.Label(errors_frame, text="Tabla de errores:", 
                                style='Title.TLabel')
         error_label.grid(row=0, column=0, sticky="w", padx=5, pady=5)
         
         # Tabla de errores
-        columns = ('Línea', 'Tipo', 'Token', 'Descripción')
+        columns = ('Token', 'Lexema', 'Renglón', 'Descripción')
         self.error_tree = ttk.Treeview(errors_frame, columns=columns, show='headings',
                                       style='Custom.Treeview')
         
         # Configurar columnas
-        self.error_tree.heading('Línea', text='Línea')
-        self.error_tree.heading('Tipo', text='Tipo')
         self.error_tree.heading('Token', text='Token')
+        self.error_tree.heading('Lexema', text='Lexema')
+        self.error_tree.heading('Renglón', text='Renglón')
         self.error_tree.heading('Descripción', text='Descripción')
         
-        self.error_tree.column('Línea', width=60, anchor='center')
-        self.error_tree.column('Tipo', width=150, anchor='center')
-        self.error_tree.column('Token', width=100, anchor='center')
+        self.error_tree.column('Token', width=60, anchor='center')
+        self.error_tree.column('Lexema', width=150, anchor='center')
+        self.error_tree.column('Renglón', width=100, anchor='center')
         self.error_tree.column('Descripción', width=300, anchor='w')
         
         # Scrollbar para la tabla de errores
@@ -259,21 +258,21 @@ class CompiladorGUI:
         self.error_tree.bind('<Double-1>', self.ir_a_linea_error)
         
     def create_tokens_tab(self):
-        """Crear la pestaña de tokens"""
+        """Creamos la tabla de simbolos"""
         tokens_frame = ttk.Frame(self.notebook)
-        self.notebook.add(tokens_frame, text="🔤 Tokens")
+        self.notebook.add(tokens_frame, text="🔤 Tabla de simbolos")
         
         # Configurar grid
         tokens_frame.rowconfigure(1, weight=1)
         tokens_frame.columnconfigure(0, weight=1)
         
         # Etiqueta
-        token_label = ttk.Label(tokens_frame, text="Análisis léxico - Tokens:", 
+        token_label = ttk.Label(tokens_frame, text="Tabla de simbolos:", 
                                style='Title.TLabel')
         token_label.grid(row=0, column=0, sticky="w", padx=5, pady=5)
         
         # Tabla de tokens
-        columns = ('Lexema', 'Tipo', 'Línea', 'Descripción')
+        columns = ('Lexema', 'Tipo de dato')
         self.token_tree = ttk.Treeview(tokens_frame, columns=columns, show='headings',
                                       style='Custom.Treeview')
         
@@ -282,9 +281,7 @@ class CompiladorGUI:
             self.token_tree.heading(col, text=col)
         
         self.token_tree.column('Lexema', width=120, anchor='center')
-        self.token_tree.column('Tipo', width=100, anchor='center')
-        self.token_tree.column('Línea', width=60, anchor='center')
-        self.token_tree.column('Descripción', width=250, anchor='w')
+        self.token_tree.column('Tipo de dato', width=100, anchor='center')
         
         # Scrollbar
         token_scrollbar = ttk.Scrollbar(tokens_frame, orient="vertical", 
@@ -294,42 +291,6 @@ class CompiladorGUI:
         # Grid
         self.token_tree.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
         token_scrollbar.grid(row=1, column=1, sticky="ns", pady=5)
-        
-    def create_symbols_tab(self):
-        """Crear la pestaña de tabla de símbolos"""
-        symbols_frame = ttk.Frame(self.notebook)
-        self.notebook.add(symbols_frame, text="📋 Símbolos")
-        
-        # Configurar grid
-        symbols_frame.rowconfigure(1, weight=1)
-        symbols_frame.columnconfigure(0, weight=1)
-        
-        # Etiqueta
-        symbol_label = ttk.Label(symbols_frame, text="Tabla de símbolos:", 
-                                style='Title.TLabel')
-        symbol_label.grid(row=0, column=0, sticky="w", padx=5, pady=5)
-        
-        # Tabla de símbolos
-        columns = ('Variable', 'Tipo', 'Valor')
-        self.symbol_tree = ttk.Treeview(symbols_frame, columns=columns, show='headings',
-                                       style='Custom.Treeview')
-        
-        # Configurar columnas
-        for col in columns:
-            self.symbol_tree.heading(col, text=col)
-        
-        self.symbol_tree.column('Variable', width=150, anchor='center')
-        self.symbol_tree.column('Tipo', width=100, anchor='center')
-        self.symbol_tree.column('Valor', width=200, anchor='w')
-        
-        # Scrollbar
-        symbol_scrollbar = ttk.Scrollbar(symbols_frame, orient="vertical", 
-                                        command=self.symbol_tree.yview)
-        self.symbol_tree.configure(yscrollcommand=symbol_scrollbar.set)
-        
-        # Grid
-        self.symbol_tree.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
-        symbol_scrollbar.grid(row=1, column=1, sticky="ns", pady=5)
         
     def create_output_tab(self):
         """Crear la pestaña de salida de ejecución"""

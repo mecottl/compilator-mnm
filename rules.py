@@ -1,478 +1,291 @@
-# rules.py - Lógica del Compilador/Intérprete Minimalista
-"""
-Este módulo contiene toda la lógica del compilador minimalista, incluyendo:
-- Análisis léxico y sintáctico
-- Tabla de símbolos
-- Validación de tipos
-- Ejecución de bucles for y print
-- Detección de errores específicos
-"""
-
+# rules.py
 import re
-from typing import Dict, List, Any, Optional, Union, Tuple
+from dataclasses import dataclass
+from typing import List, Tuple, Dict, Any, Optional
 from enum import Enum
 
-# ================================
-# TIPOS Y ENUMERACIONES
-# ================================
+# ----------------- Config / Regex -----------------
+RE_IDENTIFICADOR = re.compile(r'^mnm[A-Za-z0-9_]+$')  # identificadores comienzan con mnm
+RE_ENTERO = re.compile(r'^\d+$')
+RE_DECIMAL = re.compile(r'^\d+\.\d+$')
+RE_CADENA = re.compile(r'^".*"$')
 
-class TipoDato(Enum):
-    """Tipos de datos permitidos en el lenguaje"""
-    ENTERO = "entero"
-    DECIMAL = "decimal"
-    CADENA = "cadena"
+# Aceptamos tanto \ent como /ent ya que tu ejemplo usa /ent
+RESERVED = {"\\ent", "/ent", "\\dec", "/dec", "\\cad", "/cad"}
 
-class TipoError(Enum):
-    """Tipos de errores posibles"""
-    DECLARACION_DUPLICADA = "DECLARACION_DUPLICADA"
-    VARIABLE_INDEFINIDA = "VARIABLE_INDEFINIDA"
-    INCOMPATIBILIDAD_TIPOS = "INCOMPATIBILIDAD_TIPOS"
-    SINTAXIS_INVALIDA = "SINTAXIS_INVALIDA"
+# patrón simple para tokenizar
+TOKEN_PATTERN = re.compile(
+    r'(".*?")|([\\/][a-zA-Z]+)|([A-Za-z_][A-Za-z0-9_]*)|(\d+\.\d+|\d+)|([=;,+\-/*()\[\]])'
+)
 
-# ================================
-# CLASES DE DATOS
-# ================================
+# ----------------- Tipos -----------------
+class ErrorType(Enum):
+    SEMANTICO = "SEMÁNTICO"
+    LEXICO = "LÉXICO"
+    SINTACTICO = "SINTÁCTICO"
+    OTRO = "OTRO"
 
-class Error:
-    """Representa un error encontrado durante el análisis"""
-    def __init__(self, linea: int, tipo: TipoError, mensaje: str, token: str = ""):
-        self.linea = linea
-        self.tipo = tipo
-        self.mensaje = mensaje
-        self.token = token
-
+@dataclass
 class Token:
-    """Representa un token del análisis léxico"""
-    def __init__(self, lexema: str, tipo: str, linea: int, descripcion: str = ""):
-        self.lexema = lexema
-        self.tipo = tipo
-        self.linea = linea
-        self.descripcion = descripcion
+    lexema: str
+    tipo: str
+    linea: int
+    descripcion: str = ""
 
-class Simbolo:
-    """Representa una entrada en la tabla de símbolos"""
-    def __init__(self, nombre: str, tipo: TipoDato, valor: Any):
-        self.nombre = nombre
-        self.tipo = tipo
-        self.valor = valor
+@dataclass
+class Error:
+    token: str           # 'err', 'err1', ...
+    tipo: ErrorType      # enum para que .value funcione en GUI
+    linea: int
+    mensaje: str
+    lexema: Optional[str] = None  # útil para deduplicado (lexema + renglón)
 
-# ================================
-# COMPILADOR PRINCIPAL
-# ================================
-
+# ----------------- Compilador (implem. modular) -----------------
 class CompiladorMinimalista:
-    """Clase principal del compilador/intérprete"""
-    
     def __init__(self):
-        self.symbol_table: Dict[str, Simbolo] = {}
-        self.errores: List[Error] = []
         self.tokens: List[Token] = []
-        self.lineas_codigo: List[str] = []
-        self.salida_ejecucion: List[str] = []
-        
-        # Patrones regex para análisis léxico
-        self.patron_variable = re.compile(r'^mnm[A-Za-z0-9]+$')
-        self.patron_declaracion = re.compile(r'^/(ent|dec|cad)\s+(mnm[A-Za-z0-9]+)\s*=\s*(.+)$')
-        self.patron_for = re.compile(r'^for\s+(mnm[A-Za-z0-9]+)\s+in\s+range\((.+)\):$')
-        self.patron_print = re.compile(r'^print\("(.+)"\);$')
-        self.patron_entero = re.compile(r'^-?\d+$')
-        self.patron_decimal = re.compile(r'^-?\d+\.\d+$')
-        self.patron_cadena = re.compile(r'^".*"$')
-        self.patron_operacion = re.compile(r'^(.+)\s*([+\-*/])\s*(.+)$')
+        self.errores: List[Error] = []
+        self.tabla_simbolos: Dict[str, Dict[str, Any]] = {}
+        self._err_counter = 0
 
-    def limpiar_estado(self):
-        """Limpia el estado del compilador para un nuevo análisis"""
-        self.symbol_table.clear()
-        self.errores.clear()
-        self.tokens.clear()
-        self.lineas_codigo.clear()
-        self.salida_ejecucion.clear()
+    # Generador de nombres de token de error: err, err1, err2...
+    def _new_err_token(self) -> str:
+        if self._err_counter == 0:
+            name = "err"
+        else:
+            name = f"err{self._err_counter}"
+        self._err_counter += 1
+        return name
 
-    def analizar_codigo(self, codigo: str) -> Tuple[List[Error], List[Token]]:
+    def _add_token(self, lexema: str, tipo: str, linea: int, descripcion: str = ""):
+        self.tokens.append(Token(lexema=lexema, tipo=tipo, linea=linea, descripcion=descripcion))
+
+    def _add_error(self, tipo: ErrorType, linea: int, mensaje: str, lexema: Optional[str] = None):
+        tok = self._new_err_token()
+        self.errores.append(Error(token=tok, tipo=tipo, linea=linea, mensaje=mensaje, lexema=lexema))
+
+    def analizar_codigo(self, codigo: str) -> Tuple[List[Error], List[Token], Dict[str, Any]]:
         """
-        Función principal que analiza todo el código
-        
-        Args:
-            codigo (str): Código fuente a analizar
-            
-        Returns:
-            Tuple[List[Error], List[Token]]: Lista de errores y tokens encontrados
+        Analiza código y devuelve (errores, tokens, info_adicional).
+        info_adicional incluye:
+          - 'tabla_simbolos': dict nombre -> {'tipo': <\\ent|/ent|\\dec...>, 'valor': <val o None>}
+          - 'salida_ejecucion': list de strings (simulada)
         """
-        self.limpiar_estado()
-        
-        # Dividir código en líneas y limpiar espacios
-        self.lineas_codigo = [linea.strip() for linea in codigo.split('\n') if linea.strip()]
-        
-        # Analizar cada línea
-        nivel_indentacion = 0
-        dentro_for = False
-        instrucciones_for = []
-        
-        for i, linea in enumerate(self.lineas_codigo, 1):
-            # Detectar indentación para manejo de for
-            indentacion_actual = len(linea) - len(linea.lstrip())
-            
-            if indentacion_actual > 0 and not dentro_for:
-                self.errores.append(Error(i, TipoError.SINTAXIS_INVALIDA, 
-                                        "Indentación sin estructura de control", linea))
+        # reset estado
+        self.tokens = []
+        self.errores = []
+        self.tabla_simbolos = {}
+        self._err_counter = 0
+
+        declarados: Dict[str, str] = {}  # nombre -> tipo declarado (e.g. /ent, \dec)
+        salida_simulada: List[str] = []
+
+        lineas = codigo.splitlines()
+        for idx, linea in enumerate(lineas, start=1):
+            texto = linea.strip()
+            if texto == "":
                 continue
-            
-            if indentacion_actual == 0 and dentro_for:
-                # Fin del bloque for, ejecutar instrucciones acumuladas
-                self._ejecutar_for(instrucciones_for)
-                dentro_for = False
-                instrucciones_for = []
-            
-            if indentacion_actual > 0 and dentro_for:
-                # Instrucción dentro del for
-                instrucciones_for.append((i, linea.strip()))
+
+            # tokenizar la línea
+            parts = [m.group(0) for m in TOKEN_PATTERN.finditer(texto)]
+
+            # añadir tokens básicos para GUI
+            for p in parts:
+                tipo_token = "DESCONOCIDO"
+                if p in RESERVED:
+                    tipo_token = "Vacio"
+                elif RE_IDENTIFICADOR.match(p):
+                    tipo_token = "IDENTIFICADOR"
+                elif RE_ENTERO.match(p):
+                    tipo_token = "\ent"
+                elif RE_DECIMAL.match(p):
+                    tipo_token = "\dec"
+                elif RE_CADENA.match(p):
+                    tipo_token = "\cad"
+                elif p in ("=", ";", "+", "-", "/", "*", "(", ")", ","):
+                    tipo_token = "Vacio"
+                else:
+                    tipo_token = "Vacio"
+                self._add_token(lexema=p, tipo=tipo_token, linea=idx, descripcion="")
+
+            # ---- Declaraciones ----
+            if parts and parts[0] in RESERVED:
+                tipo_decl = parts[0]   # \ent /ent etc
+                ids = []
+                for tok in parts[1:]:
+                    if tok == ";":
+                        break
+                    if RE_IDENTIFICADOR.match(tok):
+                        ids.append(tok)
+                for nombre in ids:
+                    if nombre in declarados:
+                        self._add_error(ErrorType.SEMANTICO, idx, f"Duplicidad de declaración de '{nombre}'", lexema=nombre)
+                    else:
+                        declarados[nombre] = tipo_decl
+                        self.tabla_simbolos[nombre] = {"tipo": tipo_decl, "valor": None}
                 continue
-                
-            # Analizar línea según su tipo
-            if self.patron_for.match(linea):
-                dentro_for = True
-                self._analizar_for(linea, i)
-            elif self.patron_declaracion.match(linea):
-                self._analizar_declaracion(linea, i)
-            elif self.patron_print.match(linea):
-                self._analizar_print(linea, i)
-            elif linea:  # Línea no vacía que no coincide con patrones conocidos
-                self.errores.append(Error(i, TipoError.SINTAXIS_INVALIDA, 
-                                        "Sintaxis no reconocida", linea))
-        
-        # Si terminamos dentro de un for, ejecutar las instrucciones pendientes
-        if dentro_for:
-            self._ejecutar_for(instrucciones_for)
-        
-        return self.errores, self.tokens
 
-    def _analizar_declaracion(self, linea: str, num_linea: int):
-        """Analiza una línea de declaración de variable"""
-        match = self.patron_declaracion.match(linea)
-        if not match:
-            self.errores.append(Error(num_linea, TipoError.SINTAXIS_INVALIDA, 
-                                    "Formato de declaración inválido", linea))
-            return
-        
-        tipo_str, nombre_var, expresion = match.groups()
-        
-        # Agregar tokens
-        self.tokens.append(Token(f"/{tipo_str}", "TIPO", num_linea, "Tipo de dato"))
-        self.tokens.append(Token(nombre_var, "VARIABLE", num_linea, "Identificador de variable"))
-        self.tokens.append(Token("=", "ASIGNACION", num_linea, "Operador de asignación"))
-        
-        # Validar nombre de variable
-        if not self.patron_variable.match(nombre_var):
-            self.errores.append(Error(num_linea, TipoError.SINTAXIS_INVALIDA, 
-                                    "Nombre de variable inválido", nombre_var))
-            return
-        
-        # Verificar si la variable ya existe
-        if nombre_var in self.symbol_table:
-            self.errores.append(Error(num_linea, TipoError.DECLARACION_DUPLICADA, 
-                                    f"La variable '{nombre_var}' ya está declarada", nombre_var))
-            return
-        
-        # Mapear tipos
-        tipo_mapa = {
-            'ent': TipoDato.ENTERO,
-            'dec': TipoDato.DECIMAL,
-            'cad': TipoDato.CADENA
-        }
-        tipo = tipo_mapa[tipo_str]
-        
-        # Evaluar la expresión del lado derecho
-        valor, tipo_resultado = self._evaluar_expresion(expresion, num_linea)
-        
-        if valor is None:
-            return  # Error ya registrado en _evaluar_expresion
-        
-        # Verificar compatibilidad de tipos
-        if tipo != tipo_resultado:
-            self.errores.append(Error(num_linea, TipoError.INCOMPATIBILIDAD_TIPOS, 
-                                    f"No se puede asignar {tipo_resultado.value} a {tipo.value}", 
-                                    expresion))
-            return
-        
-        # Agregar variable a la tabla de símbolos
-        self.symbol_table[nombre_var] = Simbolo(nombre_var, tipo, valor)
-        
-        # Agregar token de valor
-        self.tokens.append(Token(str(valor), tipo_resultado.value.upper(), num_linea, 
-                                "Valor asignado"))
+            # ---- Asignaciones simples: <id> = <valor> ;
+            if "=" in parts:
+                try:
+                    pos_eq = parts.index("=")
+                except ValueError:
+                    pos_eq = -1
 
-    def _evaluar_expresion(self, expresion: str, num_linea: int) -> Tuple[Any, Optional[TipoDato]]:
-        """
-        Evalúa una expresión y retorna su valor y tipo
-        
-        Args:
-            expresion (str): Expresión a evaluar
-            num_linea (int): Número de línea para errores
-            
-        Returns:
-            Tuple[Any, Optional[TipoDato]]: Valor y tipo de la expresión
-        """
-        expresion = expresion.strip()
-        
-        # Verificar si es un literal
-        if self.patron_entero.match(expresion):
-            return int(expresion), TipoDato.ENTERO
-        elif self.patron_decimal.match(expresion):
-            return float(expresion), TipoDato.DECIMAL
-        elif self.patron_cadena.match(expresion):
-            return expresion[1:-1], TipoDato.CADENA  # Remover comillas
-        
-        # Verificar si es una variable
-        elif self.patron_variable.match(expresion):
-            if expresion not in self.symbol_table:
-                self.errores.append(Error(num_linea, TipoError.VARIABLE_INDEFINIDA, 
-                                        f"Variable '{expresion}' no está definida", expresion))
-                return None, None
-            
-            simbolo = self.symbol_table[expresion]
-            return simbolo.valor, simbolo.tipo
-        
-        # Verificar si es una operación aritmética
-        match_op = self.patron_operacion.match(expresion)
-        if match_op:
-            return self._evaluar_operacion(match_op.groups(), num_linea)
-        
-        # Expresión no reconocida
-        self.errores.append(Error(num_linea, TipoError.SINTAXIS_INVALIDA, 
-                                "Expresión no reconocida", expresion))
-        return None, None
+                if pos_eq > 0:
+                    lhs = parts[pos_eq - 1]
+                    rhs = None
+                    for tok in parts[pos_eq + 1:]:
+                        if tok == ";":
+                            break
+                        if tok.strip() == "":
+                            continue
+                        rhs = tok
+                        break
 
-    def _evaluar_operacion(self, grupos: Tuple[str, str, str], num_linea: int) -> Tuple[Any, Optional[TipoDato]]:
-        """
-        Evalúa una operación aritmética
-        
-        Args:
-            grupos (Tuple[str, str, str]): Operando1, operador, operando2
-            num_linea (int): Número de línea para errores
-            
-        Returns:
-            Tuple[Any, Optional[TipoDato]]: Resultado y tipo de la operación
-        """
-        operando1_str, operador, operando2_str = grupos
-        
-        # Evaluar operandos
-        valor1, tipo1 = self._evaluar_expresion(operando1_str, num_linea)
-        valor2, tipo2 = self._evaluar_expresion(operando2_str, num_linea)
-        
-        if valor1 is None or valor2 is None:
-            return None, None
-        
-        # Verificar compatibilidad de tipos
-        if tipo1 != tipo2:
-            self.errores.append(Error(num_linea, TipoError.INCOMPATIBILIDAD_TIPOS, 
-                                    f"No se puede operar {tipo1.value} con {tipo2.value}", 
-                                    f"{operando1_str} {operador} {operando2_str}"))
-            return None, None
-        
-        # Agregar tokens de la operación
-        self.tokens.append(Token(operador, "OPERADOR", num_linea, "Operador aritmético"))
-        
-        # Realizar operación según el tipo
-        try:
-            if tipo1 == TipoDato.CADENA:
-                if operador == '+':
-                    return valor1 + valor2, TipoDato.CADENA
-                else:
-                    self.errores.append(Error(num_linea, TipoError.SINTAXIS_INVALIDA, 
-                                            f"Operador '{operador}' no válido para cadenas", operador))
-                    return None, None
-            
-            elif tipo1 in [TipoDato.ENTERO, TipoDato.DECIMAL]:
-                if operador == '+':
-                    resultado = valor1 + valor2
-                elif operador == '-':
-                    resultado = valor1 - valor2
-                elif operador == '*':
-                    resultado = valor1 * valor2
-                elif operador == '/':
-                    if valor2 == 0:
-                        self.errores.append(Error(num_linea, TipoError.SINTAXIS_INVALIDA, 
-                                                "División por cero", f"{valor1} / {valor2}"))
-                        return None, None
-                    resultado = valor1 / valor2
-                    # Si era división entre enteros, convertir a decimal
-                    if tipo1 == TipoDato.ENTERO:
-                        return float(resultado), TipoDato.DECIMAL
-                else:
-                    self.errores.append(Error(num_linea, TipoError.SINTAXIS_INVALIDA, 
-                                            f"Operador '{operador}' no reconocido", operador))
-                    return None, None
-                
-                return resultado, tipo1
-        
-        except Exception as e:
-            self.errores.append(Error(num_linea, TipoError.SINTAXIS_INVALIDA, 
-                                    f"Error en operación: {str(e)}", 
-                                    f"{valor1} {operador} {valor2}"))
-            return None, None
-        
-        return None, None
+                    # LHS valido?
+                    if not RE_IDENTIFICADOR.match(lhs):
+                        self._add_error(ErrorType.SEMANTICO, idx, f"LHS inválido en asignación: '{lhs}'", lexema=lhs)
+                    else:
+                        # variable indefinida en lhs?
+                        if lhs not in declarados:
+                            self._add_error(ErrorType.SEMANTICO, idx, f"Variable indefinida '{lhs}' en asignación", lexema=lhs)
 
-    def _analizar_for(self, linea: str, num_linea: int):
-        """Analiza una declaración de bucle for"""
-        match = self.patron_for.match(linea)
-        if not match:
-            self.errores.append(Error(num_linea, TipoError.SINTAXIS_INVALIDA, 
-                                    "Formato de for inválido", linea))
-            return
-        
-        var_bucle, rango_expr = match.groups()
-        
-        # Agregar tokens
-        self.tokens.append(Token("for", "FOR", num_linea, "Palabra clave for"))
-        self.tokens.append(Token(var_bucle, "VARIABLE", num_linea, "Variable de bucle"))
-        self.tokens.append(Token("in", "IN", num_linea, "Palabra clave in"))
-        self.tokens.append(Token("range", "RANGE", num_linea, "Función range"))
-        
-        # Validar nombre de variable de bucle
-        if not self.patron_variable.match(var_bucle):
-            self.errores.append(Error(num_linea, TipoError.SINTAXIS_INVALIDA, 
-                                    "Nombre de variable de bucle inválido", var_bucle))
-            return
-        
-        # Evaluar expresión del rango
-        valor_rango, tipo_rango = self._evaluar_expresion(rango_expr, num_linea)
-        
-        if valor_rango is None:
-            return
-        
-        # El rango debe ser un entero
-        if tipo_rango != TipoDato.ENTERO:
-            self.errores.append(Error(num_linea, TipoError.INCOMPATIBILIDAD_TIPOS, 
-                                    f"El rango debe ser entero, no {tipo_rango.value}", rango_expr))
-            return
-        
-        if valor_rango < 0:
-            self.errores.append(Error(num_linea, TipoError.SINTAXIS_INVALIDA, 
-                                    "El rango no puede ser negativo", str(valor_rango)))
-            return
-        
-        # Guardar información del for para ejecución posterior
-        self.symbol_table[f"__FOR__{var_bucle}"] = Simbolo(var_bucle, TipoDato.ENTERO, valor_rango)
+                        rhs_tipo = None
+                        rhs_valor = None
 
-    def _analizar_print(self, linea: str, num_linea: int):
-        """Analiza una instrucción print"""
-        match = self.patron_print.match(linea)
-        if not match:
-            self.errores.append(Error(num_linea, TipoError.SINTAXIS_INVALIDA, 
-                                    "Formato de print inválido", linea))
-            return
-        
-        contenido = match.group(1)
-        
-        # Agregar tokens
-        self.tokens.append(Token("print", "PRINT", num_linea, "Función print"))
-        self.tokens.append(Token(f'"{contenido}"', "CADENA", num_linea, "Contenido a imprimir"))
-        
-        # Verificar si el contenido es una variable
-        if self.patron_variable.match(contenido):
-            if contenido not in self.symbol_table:
-                self.errores.append(Error(num_linea, TipoError.VARIABLE_INDEFINIDA, 
-                                        f"Variable '{contenido}' no está definida", contenido))
-                return
+                        if rhs is None:
+                            self._add_error(ErrorType.SEMANTICO, idx, "RHS inexistente en asignación", lexema=lhs)
+                        else:
+                            if RE_ENTERO.match(rhs):
+                                rhs_tipo = "/ent" if "/ent" in RESERVED else "\\ent"
+                                rhs_valor = int(rhs)
+                            elif RE_DECIMAL.match(rhs):
+                                rhs_tipo = "/dec" if "/dec" in RESERVED else "\\dec"
+                                rhs_valor = float(rhs)
+                            elif RE_CADENA.match(rhs):
+                                rhs_tipo = "/cad" if "/cad" in RESERVED else "\\cad"
+                                rhs_valor = rhs[1:-1]
+                            elif RE_IDENTIFICADOR.match(rhs):
+                                if rhs not in declarados:
+                                    self._add_error(ErrorType.SEMANTICO, idx, f"Variable indefinida '{rhs}' usada en asignación", lexema=rhs)
+                                else:
+                                    rhs_tipo = declarados[rhs]
+                                    rhs_valor = None
+                            else:
+                                self._add_error(ErrorType.SEMANTICO, idx, f"RHS no reconocido '{rhs}'", lexema=rhs)
 
-    def _ejecutar_for(self, instrucciones: List[Tuple[int, str]]):
-        """Ejecuta un bucle for con sus instrucciones"""
-        if not instrucciones:
-            return
-        
-        # Encontrar la variable de bucle y su rango
-        var_bucle = None
-        rango = None
-        
-        for nombre, simbolo in self.symbol_table.items():
-            if nombre.startswith("__FOR__"):
-                var_bucle = nombre.replace("__FOR__", "")
-                rango = simbolo.valor
-                break
-        
-        if var_bucle is None or rango is None:
-            return
-        
-        # Ejecutar el bucle
-        for i in range(rango):
-            # Crear/actualizar variable de bucle
-            self.symbol_table[var_bucle] = Simbolo(var_bucle, TipoDato.ENTERO, i)
-            
-            # Ejecutar cada instrucción del bucle
-            for num_linea, instruccion in instrucciones:
-                self._ejecutar_instruccion(instruccion, num_linea)
-        
-        # Limpiar variable temporal del for
-        for nombre in list(self.symbol_table.keys()):
-            if nombre.startswith("__FOR__"):
-                del self.symbol_table[nombre]
+                        # Chequear compatibilidad si ambos tipos conocidos
+                        if lhs in declarados and rhs_tipo is not None:
+                            lhs_tipo = declarados[lhs]
+                            # regla sencilla: exigir igualdad exacta
+                            if lhs_tipo != rhs_tipo:
+                                self._add_error(ErrorType.SEMANTICO, idx,
+                                                f"Incompatibilidad de tipos: asignar {rhs_tipo} a {lhs_tipo} ('{lhs}')",
+                                                lexema=lhs)
+                            else:
+                                # actualizar tabla de símbolos: si se asignó una constante, guardar valor
+                                if rhs_valor is not None:
+                                    self.tabla_simbolos.setdefault(lhs, {})["valor"] = rhs_valor
+                                    self.tabla_simbolos.setdefault(lhs, {})["tipo"] = rhs_tipo
+                                else:
+                                    self.tabla_simbolos.setdefault(lhs, {})["tipo"] = rhs_tipo
 
-    def _ejecutar_instruccion(self, instruccion: str, num_linea: int):
-        """Ejecuta una instrucción individual"""
-        # Solo ejecutar print por ahora
-        match = self.patron_print.match(instruccion)
-        if match:
-            contenido = match.group(1)
-            
-            # Si es una variable, obtener su valor
-            if self.patron_variable.match(contenido):
-                if contenido in self.symbol_table:
-                    valor = self.symbol_table[contenido].valor
-                    self.salida_ejecucion.append(str(valor))
-                else:
-                    self.salida_ejecucion.append(f"ERROR: Variable {contenido} no definida")
-            else:
-                # Es un literal de cadena
-                self.salida_ejecucion.append(contenido)
+            # ---- Manejo básico de prints -> simulación de salida ----
+            # Detectamos: print("algo"); o print(mnmX);
+            if parts and parts[0].lower() == "print":
+                # buscar el primer token entre paréntesis o siguiente
+                contenido = None
+                # intentar obtener lo que sigue
+                for tok in parts[1:]:
+                    if tok == ";":
+                        break
+                    if tok == "(" or tok == ")":
+                        continue
+                    contenido = tok
+                    break
+                if contenido is not None:
+                    # si contenido es cadena literal la agregamos; si es identificador y está declarado, añadimos marcador
+                    if RE_CADENA.match(contenido):
+                        salida_simulada.append(contenido[1:-1])
+                    elif RE_IDENTIFICADOR.match(contenido):
+                        if contenido in self.tabla_simbolos and self.tabla_simbolos[contenido].get("valor") is not None:
+                            salida_simulada.append(str(self.tabla_simbolos[contenido]["valor"]))
+                        else:
+                            # si no tiene valor, indicar su nombre (simulación)
+                            salida_simulada.append(f"<{contenido}>")
+                    else:
+                        salida_simulada.append(f"<{contenido}>")
 
-    def obtener_tabla_simbolos(self) -> Dict[str, Dict[str, Any]]:
-        """Retorna la tabla de símbolos en formato dict"""
-        return {
-            nombre: {
-                "tipo": simbolo.tipo.value,
-                "valor": simbolo.valor
-            }
-            for nombre, simbolo in self.symbol_table.items()
-            if not nombre.startswith("__")  # Excluir variables internas
+        # ---------------- DEDUPLICADO ----------------
+        # Errores: no repetir combinación (lexema, renglón)
+        errores_unicos: List[Error] = []
+        seen_lex_renglon = set()
+        for e in self.errores:
+            key = (e.lexema if e.lexema is not None else "", e.linea)
+            if key in seen_lex_renglon:
+                continue
+            seen_lex_renglon.add(key)
+            errores_unicos.append(e)
+        self.errores = errores_unicos
+
+        # Tokens: eliminar duplicados exactos (lexema, tipo, linea)
+        tokens_unicos: List[Token] = []
+        seen_tokens = set()
+        for t in self.tokens:
+            key = (t.lexema, t.tipo, t.linea)
+            if key in seen_tokens:
+                continue
+            seen_tokens.add(key)
+            tokens_unicos.append(t)
+        self.tokens = tokens_unicos
+
+        # Asegurar que tabla_simbolos tenga la forma requerida
+        tabla_final: Dict[str, Dict[str, Any]] = {}
+        for nombre, info in self.tabla_simbolos.items():
+            tabla_final[nombre] = {"tipo": info.get("tipo"), "valor": info.get("valor")}
+
+        info_adicional = {
+            "tabla_simbolos": tabla_final,
+            "salida_ejecucion": salida_simulada
         }
 
-    def obtener_salida_ejecucion(self) -> List[str]:
-        """Retorna la salida de la ejecución"""
-        return self.salida_ejecucion.copy()
+        return self.errores, self.tokens, info_adicional
 
-# ================================
-# FUNCIÓN PRINCIPAL DE ANÁLISIS
-# ================================
-
-# Instancia global del compilador
-compilador = CompiladorMinimalista()
+# ----------------- Funciones públicas para importar -----------------
+_compilador_singleton = CompiladorMinimalista()
 
 def analizar_codigo(codigo: str) -> Tuple[List[Error], List[Token], Dict[str, Any]]:
-    """
-    Función principal para analizar código desde la GUI
-    
-    Args:
-        codigo (str): Código fuente a analizar
-        
-    Returns:
-        Tuple: (errores, tokens, información adicional)
-    """
-    errores, tokens = compilador.analizar_codigo(codigo)
-    
-    info_adicional = {
-        "tabla_simbolos": compilador.obtener_tabla_simbolos(),
-        "salida_ejecucion": compilador.obtener_salida_ejecucion(),
-        "total_errores": len(errores),
-        "total_tokens": len(tokens)
-    }
-    
-    return errores, tokens, info_adicional
+    """Función pública usada por gui.py"""
+    return _compilador_singleton.analizar_codigo(codigo)
 
-def obtener_tabla_simbolos() -> Dict[str, Dict[str, Any]]:
-    """Retorna la tabla de símbolos actual"""
-    return compilador.obtener_tabla_simbolos()
+def obtener_tabla_simbolos(info_adicional: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    """Retorna la tabla de símbolos desde info_adicional (helper)"""
+    return info_adicional.get("tabla_simbolos", {})
 
-def obtener_salida_ejecucion() -> List[str]:
-    """Retorna la salida de ejecución actual"""
-    return compilador.obtener_salida_ejecucion()
+def obtener_salida_ejecucion(info_adicional: Dict[str, Any]) -> List[str]:
+    """Retorna la salida de ejecución desde info_adicional (helper)"""
+    return info_adicional.get("salida_ejecucion", [])
+
+# ----------------- prueba rápida si se ejecuta directamente -----------------
+if __name__ == "__main__":
+    ejemplo = """/ent mnmX = 5
+/dec mnmY = 2.5
+/ent mnmZ = mnmX
+/cad mnmSaludo = "Hola"
+mnmA = 1
+print("Hola mundo");
+print(mnmX);
+"""
+    errs, toks, info = analizar_codigo(ejemplo)
+    print("ERRORES:")
+    for e in errs:
+        print(f"{e.token} | {e.tipo.value} | L{e.linea} | {e.mensaje} | lexema={e.lexema}")
+    print("\nTOKENS (muestra):")
+    for t in toks[:40]:
+        print(t)
+    print("\nTABLA SIMBOLOS:")
+    for k,v in info["tabla_simbolos"].items():
+        print(k, v)
+    print("\nSALIDA:")
+    print(info["salida_ejecucion"])

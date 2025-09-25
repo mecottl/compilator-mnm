@@ -9,8 +9,8 @@ RE_IDENTIFICADOR = re.compile(r'^mnm[A-Za-z0-9_]+$')   # identificadores comienz
 RE_ENTERO = re.compile(r'^\d+$')
 RE_DECIMAL = re.compile(r'^\d+\.\d+$')
 
-# Acepta: "texto", “texto”, 'texto', ‘texto’ (sin saltos de línea)
-RE_CADENA = re.compile(r'^(?:"[^"\n]*"|“[^”\n]*”|\'[^\'\n]*\'|‘[^’\n]*’)$')
+# Acepta: "texto"
+RE_CADENA = re.compile(r'^(?:"[^"\n]*")$')
 
 # Declaraciones válidas en fuente: solo con backslash "\ent", "\dec", "\cad"
 VALID_DECL_FORMS = {"\\ent", "\\dec", "\\cad"}
@@ -26,7 +26,7 @@ KEYWORDS = {"print", "for", "in", "range"}
 
 # Tokenizador (incluye comillas rectas y curvy)
 TOKEN_PATTERN = re.compile(
-    r'("([^"\n]*)"|“[^”\n]*”|\'[^\'\n]*\'|‘[^’\n]*’)|([\\/][A-Za-z]+)|([A-Za-z_][A-Za-z0-9_]*)|(\d+\.\d+|\d+)|([=;,+\-/*()\[\]{}:])'
+    r'("([^"\n]*)"|([\\/][A-Za-z]+)|([A-Za-z_][A-Za-z0-9_]*)|(\d+\.\d+|\d+)|([=;,+\-/*()\[\]{}:])'
 )
 
 # ----------------- Tipos de error -----------------

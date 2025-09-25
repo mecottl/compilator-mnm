@@ -49,7 +49,7 @@ class CompiladorGUI:
 
     def setup_window(self):
         """Configuración inicial de la ventana"""
-        self.root.title("Compilador - Lenguaje mnm ")
+        self.root.title("mnmCompilador")
         self.root.geometry("1400x900")
         self.root.minsize(1200, 700)
 
@@ -66,14 +66,15 @@ class CompiladorGUI:
     def setup_styles(self):
         """Configuración de estilos y colores"""
         self.colors = {
-            'bg_main': '#2b2b2b',
-            'bg_secondary': '#3c3c3c',
-            'fg_text': '#ffffff',
-            'fg_secondary': '#cccccc',
-            'accent': '#4a90e2',
-            'error': '#ff6b6b',
-            'success': '#51c951',
-            'warning': '#ffa726'
+            'bg_main': '#1b2e1b',        # Verde oscuro
+            'bg_secondary': '#234f23',   # Verde medio
+            'fg_text':   "#fff" ,  # Verde claro para texto
+            'fg_title': "#1d2c1d",  
+            'fg_secondary': '#b6e2b6',   # Verde pálido para secundarios
+            'accent': '#43a047',         # Verde acento
+            'error': '#ff6b6b',          # Rojo para errores (mantener para contraste)
+            'success': "#ffffff",        # Verde éxito
+            'warning': '#ffa726'         # Naranja para advertencias
         }
 
         # Configurar estilo para ttk
@@ -85,8 +86,7 @@ class CompiladorGUI:
 
         # Estilos personalizados
         self.style.configure('Title.TLabel',
-                             background=self.colors['bg_main'],
-                             foreground=self.colors['fg_text'],
+                             foreground=self.colors['fg_title'],
                              font=('Arial', 12, 'bold'))
 
         self.style.configure('Custom.Treeview',
@@ -115,7 +115,7 @@ class CompiladorGUI:
         header_frame.grid(row=0, column=0, sticky="ew", pady=(0, 5))
 
         # Título
-        title_label = ttk.Label(header_frame, text="Compilador - Lenguaje mnm",
+        title_label = ttk.Label(header_frame, text="mnmCompilador",
                                 style='Title.TLabel')
         title_label.grid(row=0, column=0, sticky="w")
 
@@ -123,15 +123,15 @@ class CompiladorGUI:
         button_frame = ttk.Frame(header_frame)
         button_frame.grid(row=0, column=1, sticky="e")
 
-        self.btn_compilar = ttk.Button(button_frame, text="🔧 Compilar",
+        self.btn_compilar = ttk.Button(button_frame, text="Compilar",
                                        command=self.compilar_codigo)
         self.btn_compilar.grid(row=0, column=0, padx=2)
 
-        self.btn_limpiar = ttk.Button(button_frame, text="🗑️ Limpiar",
+        self.btn_limpiar = ttk.Button(button_frame, text="Limpiar",
                                       command=self.limpiar_todo)
         self.btn_limpiar.grid(row=0, column=1, padx=2)
 
-        self.btn_ejemplo = ttk.Button(button_frame, text="📝 Ejemplo",
+        self.btn_ejemplo = ttk.Button(button_frame, text="Ejemplo",
                                       command=self.cargar_ejemplo)
         self.btn_ejemplo.grid(row=0, column=2, padx=2)
 
@@ -160,7 +160,7 @@ class CompiladorGUI:
         left_frame.columnconfigure(0, weight=1)
 
         # Etiqueta del editor
-        code_label = ttk.Label(left_frame, text="📝 Editor de Código",
+        code_label = ttk.Label(left_frame, text="Editor de Código",
                                style='Title.TLabel')
         code_label.grid(row=0, column=0, sticky="w", pady=(0, 5))
 

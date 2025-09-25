@@ -133,16 +133,43 @@ class CompiladorMinimalista:
                 elif tok_type == "CONSTANTE_CADENA":
                     registrar_en_tabla(p, "\cad", p[1:-1])
 
-            # -------- Declaraciones --------
+            # -------- Declaraciones (con posible inicialización) --------
             if parts:
                 first = parts[0]
                 if first in VALID_DECL_FORMS:
                     tipo_decl = CANONICAL_FROM_DECL[first]
+
+                    def inferir_tipo_y_valor(rhs_tokens: List[str]) -> Tuple[Optional[str], Optional[Any]]:
+                        # Inferencia compatible con tu bloque de asignaciones
+                        if not rhs_tokens:
+                            return None, None
+                        if len(rhs_tokens) == 1:
+                            t = rhs_tokens[0]
+                            if RE_ENTERO.match(t):   return "/ent", int(t)
+                            if RE_DECIMAL.match(t):  return "/dec", float(t)
+                            if RE_CADENA.match(t):   return "/cad", t[1:-1]
+                            if RE_IDENTIFICADOR.match(t):
+                                return declarados.get(t), None
+                            return None, None
+                        # Expresión: presencia decide
+                        has_cad = any(RE_CADENA.match(t) for t in rhs_tokens)
+                        has_dec = any(RE_DECIMAL.match(t) for t in rhs_tokens)
+                        has_ent = any(RE_ENTERO.match(t) for t in rhs_tokens)
+                        if has_cad: return "/cad", None
+                        if has_dec: return "/dec", None
+                        if has_ent: return "/ent", None
+                        id_types = {declarados.get(t) for t in rhs_tokens if RE_IDENTIFICADOR.match(t)}
+                        id_types.discard(None)
+                        if len(id_types) == 1:
+                            return next(iter(id_types)), None
+                        return None, None
+
                     pos = 1
                     while pos < len(parts):
                         tok = parts[pos]
                         if tok == ";":
                             break
+
                         if RE_IDENTIFICADOR.match(tok):
                             nombre = tok
                             if nombre in declarados:
@@ -150,11 +177,69 @@ class CompiladorMinimalista:
                             else:
                                 declarados[nombre] = tipo_decl
                                 registrar_en_tabla(nombre, tipo_decl, None)
+
+                            # ¿viene una inicialización?
+                            j = pos + 1
+                            if j < len(parts) and parts[j] == "=":
+                                # recolectar RHS hasta coma o punto y coma
+                                rhs_tokens: List[str] = []
+                                k = j + 1
+                                while k < len(parts) and parts[k] not in {",", ";"}:
+                                    if parts[k].strip():
+                                        rhs_tokens.append(parts[k])
+                                    k += 1
+
+                                # inferir tipo/valor del RHS
+                                rhs_tipo, rhs_valor = inferir_tipo_y_valor(rhs_tokens)
+
+                                # compatibilidad estricta
+                                if rhs_tipo is not None:
+                                    lhs_tipo = tipo_decl
+                                    compatible = (
+                                        (lhs_tipo == "/ent" and rhs_tipo == "/ent") or
+                                        (lhs_tipo == "/dec" and rhs_tipo in ("/ent", "/dec")) or
+                                        (lhs_tipo == "/cad" and rhs_tipo == "/cad")
+                                    )
+                                    if not compatible:
+                                        tipo_fuente = CANONICAL_TO_SOURCE.get(lhs_tipo, lhs_tipo)
+                                        # Mostrar la cadena si existe; si no, el primer token del RHS
+                                        show_lex = None
+                                        for t in rhs_tokens:
+                                            if RE_CADENA.match(t):
+                                                show_lex = t; break
+                                        self._add_error(
+                                            ErrorType.SEMANTICO, idx,
+                                            f"Incompatibilidad de tipo {tipo_fuente}",
+                                            lexema=show_lex if show_lex is not None else (rhs_tokens[0] if rhs_tokens else None)
+                                        )
+                                    else:
+                                        # almacenar valor si es constante
+                                        if rhs_valor is not None:
+                                            if lhs_tipo == "/dec" and rhs_tipo == "/ent":
+                                                registrar_en_tabla(nombre, lhs_tipo, float(rhs_valor))
+                                            else:
+                                                registrar_en_tabla(nombre, lhs_tipo, rhs_valor)
+
+                                # saltar hasta k (ya procesamos '=' y RHS)
+                                pos = k
+                            else:
+                                pos += 1
+
+                            # si hay coma, consumirla aquí para continuar con el siguiente id
+                            if pos < len(parts) and parts[pos] == ",":
+                                pos += 1
+                            continue
+
+                        # cualquier otro token (p.ej. comas sueltas) se avanza
                         pos += 1
+
                     registrar_en_tabla(first, "", None)
                     continue
+
                 if first in INVALID_DECL_FORMS:
+                    # ya se reportó el error en la tokenización
                     continue
+
 
             # -------- Asignaciones --------
             if "=" in parts:

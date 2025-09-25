@@ -115,7 +115,7 @@ class CompiladorGUI:
         header_frame.grid(row=0, column=0, sticky="ew", pady=(0, 5))
 
         # Título
-        title_label = ttk.Label(header_frame, text="Compilador Minimalista - Lenguaje mnm",
+        title_label = ttk.Label(header_frame, text="Compilador - Lenguaje mnm",
                                 style='Title.TLabel')
         title_label.grid(row=0, column=0, sticky="w")
 

@@ -175,7 +175,7 @@ class CompiladorMinimalista:
                             nombre = tok
                             if nombre in declarados:
                                 # duplicidad: mensaje EXACTO pedido
-                                self._add_error(ErrorType.SEMANTICO, idx, "duplicidad de declaración", lexema=nombre)
+                                self._add_error(ErrorType.SEMANTICO, idx, "Duplicidad de declaración", lexema=nombre)
                             else:
                                 declarados[nombre] = tipo_decl_internal
                                 registrar_en_tabla(nombre, tipo_decl_internal, None)
@@ -205,7 +205,7 @@ class CompiladorMinimalista:
                         rhs = tok
                         break
 
-                    registrar_en_tabla("=", "SIMBOLO", None)
+                    registrar_en_tabla("=", "", None)
 
                     # validar LHS
                     if lhs is None or not RE_IDENTIFICADOR.match(lhs):
@@ -214,7 +214,7 @@ class CompiladorMinimalista:
                     else:
                         if lhs not in declarados:
                             # variable indefinida: mensaje EXACTO pedido
-                            self._add_error(ErrorType.SEMANTICO, idx, "variable indefinida", lexema=lhs)
+                            self._add_error(ErrorType.SEMANTICO, idx, "Variable indefinida", lexema=lhs)
                             registrar_en_tabla(lhs, "", None)
                         else:
                             registrar_en_tabla(lhs, declarados[lhs], None)
@@ -238,7 +238,7 @@ class CompiladorMinimalista:
                             elif RE_IDENTIFICADOR.match(rhs):
                                 if rhs not in declarados:
                                     # variable indefinida en RHS: mensaje EXACTO pedido
-                                    self._add_error(ErrorType.SEMANTICO, idx, "variable indefinida", lexema=rhs)
+                                    self._add_error(ErrorType.SEMANTICO, idx, "Variable indefinida", lexema=rhs)
                                     registrar_en_tabla(rhs, "IDENTIFICADOR", None)
                                 else:
                                     rhs_tipo = declarados[rhs]
@@ -252,7 +252,7 @@ class CompiladorMinimalista:
                                 # incompatibilidad: mensaje EXACTO pedido, mostrar tipo fuente (backslash) del LHS
                                 tipo_fuente = CANONICAL_TO_SOURCE.get(lhs_tipo, lhs_tipo)
                                 # lexema: según tu ejemplo, queremos que la columna "Lexema" muestre el valor intentado (rhs)
-                                self._add_error(ErrorType.SEMANTICO, idx, f"incompatibilidad de tipo {tipo_fuente}", lexema=rhs)
+                                self._add_error(ErrorType.SEMANTICO, idx, f"Incompatibilidad de tipo {tipo_fuente}", lexema=rhs)
                             else:
                                 # si RHS es constante actualizamos valor en tabla
                                 if rhs_valor is not None:
@@ -264,7 +264,7 @@ class CompiladorMinimalista:
                 if RE_IDENTIFICADOR.match(p):
                     if p not in declarados:
                         # variable indefinida (mensaje EXACTO)
-                        self._add_error(ErrorType.SEMANTICO, idx, "variable indefinida", lexema=p)
+                        self._add_error(ErrorType.SEMANTICO, idx, "Variable indefinida", lexema=p)
                         registrar_en_tabla(p, "", None)
 
             # ---------------- registrar keywords como símbolos en tabla ----------------

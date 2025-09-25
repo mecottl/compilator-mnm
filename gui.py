@@ -491,7 +491,7 @@ class CompiladorGUI:
                 self.status_text.set("Error en compilación")
 
     def mostrar_errores(self):
-        """Mostrar errores en la tabla y resaltar líneas"""
+        """Mostrar errores en la tabla y resaltar líneas (Token | Lexema | Renglón | Descripción)"""
         if not self.error_tree:
             return
 
@@ -501,12 +501,17 @@ class CompiladorGUI:
 
         # Agregar errores
         for error in self.errores_actuales:
-            # Insertar fila: Token, Tipo, Renglón, Descripción
+            # En la segunda columna ponemos el lexema implicado (si existe), sino vacío
+            lexema = error.lexema if getattr(error, 'lexema', None) is not None else ""
+            descripcion = error.mensaje
+            renglon = error.linea if getattr(error, 'linea', None) is not None else ""
+
+            # Insertar fila: Token, Lexema, Renglón, Descripción
             self.error_tree.insert('', 'end', values=(
                 error.token,
-                error.tipo.value,
-                error.linea,
-                error.mensaje
+                lexema,
+                renglon,
+                descripcion
             ))
 
             # Resaltar línea con error en el editor
@@ -517,6 +522,7 @@ class CompiladorGUI:
                     self.text_editor.tag_add('error_line', line_start, line_end)
                 except:
                     pass
+
 
     def mostrar_tokens(self):
         """Mostrar tabla simplificada (nombre, tipo)"""
@@ -530,9 +536,14 @@ class CompiladorGUI:
         # Obtener tabla de símbolos desde info_adicional
         tabla_simbolos = self.info_adicional.get('tabla_simbolos', {})
 
+        # Importar el diccionario de conversión
+        from rules import CANONICAL_TO_SOURCE
+
         # Mostrar solo las entradas (nombre, tipo)
         for nombre, info in tabla_simbolos.items():
             tipo_dato = info.get('tipo', '')
+            # Convertir tipo interno a fuente si aplica
+            tipo_dato = CANONICAL_TO_SOURCE.get(tipo_dato, tipo_dato)
             self.token_tree.insert('', 'end', values=(nombre, tipo_dato))
 
     def mostrar_salida(self):

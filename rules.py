@@ -12,29 +12,19 @@ RE_DECIMAL = re.compile(r'^\d+\.\d+$')
 # Acepta: "texto", “texto”, 'texto', ‘texto’ (sin saltos de línea)
 RE_CADENA = re.compile(r'^(?:"[^"\n]*"|“[^”\n]*”|\'[^\'\n]*\'|‘[^’\n]*’)$')
 
-# Declaraciones válidas en fuente: sólo con backslash "\ent", "\dec", "\cad"
+# Declaraciones válidas en fuente: solo con backslash "\ent", "\dec", "\cad"
 VALID_DECL_FORMS = {"\\ent", "\\dec", "\\cad"}
 # Formas NO PERMITIDAS en fuente: con slash "/ent", "/dec", "/cad"
 INVALID_DECL_FORMS = {"/ent", "/dec", "/cad"}
 
-# Internal canonical type names (usadas internamente para comparar tipos)
-# Usamos las formas internas '/ent', '/dec', '/cad' para comparar tipos,
-# pero en las descripciones mostramos la forma de fuente con backslash.
-CANONICAL_FROM_DECL = {
-    "\\ent": "/ent",
-    "\\dec": "/dec",
-    "\\cad": "/cad"
-}
-CANONICAL_TO_SOURCE = {
-    "/ent": r"\ent",
-    "/dec": r"\dec",
-    "/cad": r"\cad"
-}
+# Tipos internos canónicos
+CANONICAL_FROM_DECL = {"\\ent": "/ent", "\\dec": "/dec", "\\cad": "/cad"}
+CANONICAL_TO_SOURCE = {"/ent": r"\ent", "/dec": r"\dec", "/cad": r"\cad"}
 
-# Palabras clave adicionales que quieres ver en la tabla
+# Palabras clave que tokenizamos
 KEYWORDS = {"print", "for", "in", "range"}
 
-# Patrón para tokenizar: cadenas (rectas y curvy), formas con slash/backslash, ids, números, operadores/símbolos
+# Tokenizador (incluye comillas rectas y curvy)
 TOKEN_PATTERN = re.compile(
     r'("([^"\n]*)"|“[^”\n]*”|\'[^\'\n]*\'|‘[^’\n]*’)|([\\/][A-Za-z]+)|([A-Za-z_][A-Za-z0-9_]*)|(\d+\.\d+|\d+)|([=;,+\-/*()\[\]{}:])'
 )
@@ -55,11 +45,11 @@ class Token:
 
 @dataclass
 class Error:
-    token: str           # 'err', 'err1', ...
-    tipo: ErrorType      # enum para que .value funcione en GUI
+    token: str
+    tipo: ErrorType
     linea: int
     mensaje: str
-    lexema: Optional[str] = None  # lexema relacionado (p.ej. el literal o identificador)
+    lexema: Optional[str] = None
 
 # ----------------- Compilador -----------------
 class CompiladorMinimalista:
@@ -70,10 +60,7 @@ class CompiladorMinimalista:
         self._err_counter = 0
 
     def _new_err_token(self) -> str:
-        if self._err_counter == 0:
-            name = "err"
-        else:
-            name = f"err{self._err_counter}"
+        name = "err" if self._err_counter == 0 else f"err{self._err_counter}"
         self._err_counter += 1
         return name
 
@@ -85,22 +72,15 @@ class CompiladorMinimalista:
         self.errores.append(Error(token=tok, tipo=tipo, linea=linea, mensaje=mensaje, lexema=lexema))
 
     def analizar_codigo(self, codigo: str) -> Tuple[List[Error], List[Token], Dict[str, Any]]:
-        """
-        Analiza el código y devuelve (errores, tokens, info_adicional).
-        info_adicional incluye:
-          - 'tabla_simbolos': dict lexema -> {'tipo': <...>, 'valor': <...>}
-          - 'salida_ejecucion': list de strings (simulada)
-        """
         # reset
         self.tokens = []
         self.errores = []
         self.tabla_simbolos = {}
         self._err_counter = 0
 
-        declarados: Dict[str, str] = {}  # nombre -> tipo declarado interno ('/ent', '/dec', '/cad')
+        declarados: Dict[str, str] = {}  # nombre -> '/ent' | '/dec' | '/cad'
         salida_simulada: List[str] = []
 
-        # Helper: asegurar inserción en tabla_simbolos sin duplicados
         def registrar_en_tabla(lex: str, tipo: str, valor: Optional[Any] = None):
             if lex in self.tabla_simbolos:
                 if valor is not None:
@@ -116,56 +96,48 @@ class CompiladorMinimalista:
             if texto == "":
                 continue
 
-            # tokenizar todo
             parts = [m.group(0) for m in TOKEN_PATTERN.finditer(texto)]
 
-            # Añadir tokens para la vista raw
+            # tokens crudos (para la GUI)
             for p in parts:
-                tipo_token = "OTRO"
+                tok_type = "OTRO"
                 p_lower = p.lower()
-                # detectar formas inválidas con slash (p. ej. /ent) -> error semántico (pero dejamos mensaje específico aparte)
                 if p in INVALID_DECL_FORMS:
-                    tipo_token = "PALABRA_RESERVADA"
+                    tok_type = "PALABRA_RESERVADA"
                     self._add_error(ErrorType.SEMANTICO, idx,
                                     "forma de declaración inválida (use '\\ent', '\\dec' o '\\cad')",
                                     lexema=p)
                 elif p in VALID_DECL_FORMS:
-                    tipo_token = "PALABRA_RESERVADA"
+                    tok_type = "PALABRA_RESERVADA"
                 elif p_lower in KEYWORDS:
-                    tipo_token = "PALABRA_RESERVADA"
+                    tok_type = "PALABRA_RESERVADA"
                 elif RE_IDENTIFICADOR.match(p):
-                    tipo_token = "IDENTIFICADOR"
+                    tok_type = "IDENTIFICADOR"
                 elif RE_ENTERO.match(p):
-                    tipo_token = "CONSTANTE_ENTERA"
+                    tok_type = "CONSTANTE_ENTERA"
                 elif RE_DECIMAL.match(p):
-                    tipo_token = "CONSTANTE_DECIMAL"
+                    tok_type = "CONSTANTE_DECIMAL"
                 elif RE_CADENA.match(p):
-                    tipo_token = "CONSTANTE_CADENA"
+                    tok_type = "CONSTANTE_CADENA"
                 elif p in ("=", ";", "+", "-", "/", "*", "(", ")", ",", "[", "]", "{", "}", ":"):
-                    tipo_token = "SIMBOLO"
-                else:
-                    tipo_token = "OTRO"
+                    tok_type = "SIMBOLO"
+                self._add_token(p, tok_type, idx)
 
-                self._add_token(lexema=p, tipo=tipo_token, linea=idx, descripcion="")
-
-                # Registrar en tabla_simbolos según tipo
-                if tipo_token == "SIMBOLO":
+                # tabla de símbolos básica
+                if tok_type == "SIMBOLO" or tok_type == "PALABRA_RESERVADA":
                     registrar_en_tabla(p, "", None)
-                elif tipo_token == "PALABRA_RESERVADA":
-                    registrar_en_tabla(p, "", None)
-                elif tipo_token == "CONSTANTE_ENTERA":
+                elif tok_type == "CONSTANTE_ENTERA":
                     registrar_en_tabla(p, "\ent", int(p))
-                elif tipo_token == "CONSTANTE_DECIMAL":
+                elif tok_type == "CONSTANTE_DECIMAL":
                     registrar_en_tabla(p, "\dec", float(p))
-                elif tipo_token == "CONSTANTE_CADENA":
+                elif tok_type == "CONSTANTE_CADENA":
                     registrar_en_tabla(p, "\cad", p[1:-1])
-                # IDENTIFICADOR se registra al declararse o asignarse
 
-            # ---------------- Declaraciones (solo con backslash) ----------------
+            # -------- Declaraciones --------
             if parts:
                 first = parts[0]
                 if first in VALID_DECL_FORMS:
-                    tipo_decl_internal = CANONICAL_FROM_DECL.get(first)
+                    tipo_decl = CANONICAL_FROM_DECL[first]
                     pos = 1
                     while pos < len(parts):
                         tok = parts[pos]
@@ -176,15 +148,15 @@ class CompiladorMinimalista:
                             if nombre in declarados:
                                 self._add_error(ErrorType.SEMANTICO, idx, "Duplicidad de declaración", lexema=nombre)
                             else:
-                                declarados[nombre] = tipo_decl_internal
-                                registrar_en_tabla(nombre, tipo_decl_internal, None)
+                                declarados[nombre] = tipo_decl
+                                registrar_en_tabla(nombre, tipo_decl, None)
                         pos += 1
                     registrar_en_tabla(first, "", None)
                     continue
                 if first in INVALID_DECL_FORMS:
                     continue
 
-            # ---------------- Asignaciones: <id> = <valor> ; ----------------
+            # -------- Asignaciones --------
             if "=" in parts:
                 try:
                     pos_eq = parts.index("=")
@@ -193,14 +165,15 @@ class CompiladorMinimalista:
 
                 if pos_eq > 0:
                     lhs = parts[pos_eq - 1] if pos_eq - 1 >= 0 else None
-                    rhs = None
+
+                    # recolectar TODOS los tokens del RHS hasta ';'
+                    rhs_tokens: List[str] = []
                     for tok in parts[pos_eq + 1:]:
                         if tok == ";":
                             break
                         if tok.strip() == "":
                             continue
-                        rhs = tok
-                        break
+                        rhs_tokens.append(tok)
 
                     registrar_en_tabla("=", "", None)
 
@@ -214,95 +187,121 @@ class CompiladorMinimalista:
                         else:
                             registrar_en_tabla(lhs, declarados[lhs], None)
 
-                        rhs_tipo = None
+                        # --- Inferencia de tipo del RHS ---
+                        rhs_tipo: Optional[str] = None
                         rhs_valor: Optional[Any] = None
 
-                        if rhs is None:
+                        if not rhs_tokens:
                             self._add_error(ErrorType.SEMANTICO, idx, "RHS inexistente en asignación", lexema=lhs)
                         else:
-                            if RE_ENTERO.match(rhs):
-                                rhs_tipo = "/ent"
-                                rhs_valor = int(rhs)
-                            elif RE_DECIMAL.match(rhs):
-                                rhs_tipo = "/dec"
-                                rhs_valor = float(rhs)
-                            elif RE_CADENA.match(rhs):
-                                rhs_tipo = "/cad"
-                                rhs_valor = rhs[1:-1]
-                            elif RE_IDENTIFICADOR.match(rhs):
-                                if rhs not in declarados:
-                                    self._add_error(ErrorType.SEMANTICO, idx, "Variable indefinida", lexema=rhs)
-                                    registrar_en_tabla(rhs, "", None)
+                            if len(rhs_tokens) == 1:
+                                rhs = rhs_tokens[0]
+                                if RE_ENTERO.match(rhs):
+                                    rhs_tipo = "/ent"; rhs_valor = int(rhs)
+                                elif RE_DECIMAL.match(rhs):
+                                    rhs_tipo = "/dec"; rhs_valor = float(rhs)
+                                elif RE_CADENA.match(rhs):
+                                    rhs_tipo = "/cad"; rhs_valor = rhs[1:-1]
+                                elif RE_IDENTIFICADOR.match(rhs):
+                                    if rhs not in declarados:
+                                        self._add_error(ErrorType.SEMANTICO, idx, "Variable indefinida", lexema=rhs)
+                                        registrar_en_tabla(rhs, "", None)
+                                    else:
+                                        rhs_tipo = declarados[rhs]
                                 else:
-                                    rhs_tipo = declarados[rhs]
+                                    self._add_error(ErrorType.SEMANTICO, idx, "RHS no reconocido", lexema=str(rhs))
                             else:
-                                self._add_error(ErrorType.SEMANTICO, idx, "RHS no reconocido", lexema=str(rhs))
+                                # Hay una expresión: inferimos tipo por presencia
+                                has_cad = any(RE_CADENA.match(t) for t in rhs_tokens)
+                                has_dec = any(RE_DECIMAL.match(t) for t in rhs_tokens)
+                                has_ent = any(RE_ENTERO.match(t) for t in rhs_tokens)
 
-                        # compatibilidad de tipos: si lhs declarado y rhs_tipo conocido
+                                if has_cad:
+                                    rhs_tipo = "/cad"
+                                    # valor solo si la expresión es exactamente una cadena, que no es el caso
+                                    rhs_valor = None
+                                elif has_dec:
+                                    rhs_tipo = "/dec"; rhs_valor = None
+                                elif has_ent:
+                                    rhs_tipo = "/ent"; rhs_valor = None
+                                else:
+                                    # mirar tipos de identificadores (si todos coinciden, usa ese)
+                                    id_types = {declarados.get(t) for t in rhs_tokens if RE_IDENTIFICADOR.match(t)}
+                                    id_types.discard(None)
+                                    if len(id_types) == 1:
+                                        rhs_tipo = next(iter(id_types))
+                                    # si no podemos inferir, lo dejamos como None y no asignamos valor
+
+                        # --- Compatibilidad estricta ---
                         if lhs in declarados and rhs_tipo is not None:
                             lhs_tipo = declarados[lhs]
-                            if lhs_tipo != rhs_tipo:
+                            compatible = (
+                                (lhs_tipo == "/ent" and rhs_tipo == "/ent") or
+                                (lhs_tipo == "/dec" and rhs_tipo in ("/ent", "/dec")) or
+                                (lhs_tipo == "/cad" and rhs_tipo == "/cad")
+                            )
+                            if not compatible:
                                 tipo_fuente = CANONICAL_TO_SOURCE.get(lhs_tipo, lhs_tipo)
-                                self._add_error(ErrorType.SEMANTICO, idx, f"Incompatibilidad de tipo {tipo_fuente}", lexema=rhs)
+                                # lexema: si hay cadena en la expresión, intenta mostrar esa cadena
+                                show_lex = None
+                                for t in rhs_tokens:
+                                    if RE_CADENA.match(t):
+                                        show_lex = t; break
+                                self._add_error(ErrorType.SEMANTICO, idx,
+                                                f"Incompatibilidad de tipo {tipo_fuente}",
+                                                lexema=show_lex if show_lex is not None else (rhs_tokens[0] if rhs_tokens else None))
                             else:
                                 if rhs_valor is not None:
-                                    registrar_en_tabla(lhs, lhs_tipo, rhs_valor)
+                                    if lhs_tipo == "/dec" and rhs_tipo == "/ent":
+                                        registrar_en_tabla(lhs, lhs_tipo, float(rhs_valor))
+                                    else:
+                                        registrar_en_tabla(lhs, lhs_tipo, rhs_valor)
 
-            # ---------------- detectar usos de identificadores no declarados en la línea ----------------
+            # -------- variables no declaradas usadas en la línea --------
             for p in parts:
-                if RE_IDENTIFICADOR.match(p):
-                    if p not in declarados:
-                        self._add_error(ErrorType.SEMANTICO, idx, "Variable indefinida", lexema=p)
-                        registrar_en_tabla(p, "", None)
+                if RE_IDENTIFICADOR.match(p) and p not in declarados:
+                    self._add_error(ErrorType.SEMANTICO, idx, "Variable indefinida", lexema=p)
+                    registrar_en_tabla(p, "", None)
 
-            # ---------------- registrar keywords como símbolos en tabla ----------------
             for tok in parts:
                 if isinstance(tok, str) and tok.lower() in KEYWORDS:
                     registrar_en_tabla(tok.lower(), "", None)
 
-        # ------------------- DEDUPLICADO FINAL -------------------
+        # ---- Deduplicado de errores ----
         errores_unicos: List[Error] = []
-        seen_lex_renglon = set()
+        seen = set()
         for e in self.errores:
             key = (e.lexema if e.lexema is not None else "", e.linea, e.mensaje)
-            if key in seen_lex_renglon:
+            if key in seen: 
                 continue
-            seen_lex_renglon.add(key)
-            errores_unicos.append(e)
+            seen.add(key); errores_unicos.append(e)
         self.errores = errores_unicos
 
-        # Tokens: eliminar duplicados exactos (lexema, tipo, linea)
+        # ---- Deduplicado de tokens ----
         tokens_unicos: List[Token] = []
-        seen_tokens = set()
+        seen_t = set()
         for t in self.tokens:
             key = (t.lexema, t.tipo, t.linea)
-            if key in seen_tokens:
+            if key in seen_t: 
                 continue
-            seen_tokens.add(key)
-            tokens_unicos.append(t)
+            seen_t.add(key); tokens_unicos.append(t)
         self.tokens = tokens_unicos
 
-        # Filtrar y formatear tabla_simbolos final
+        # ---- Tabla de símbolos final ordenada ----
         tabla_final: Dict[str, Dict[str, Any]] = {}
         for nombre, info in self.tabla_simbolos.items():
             if (RE_IDENTIFICADOR.match(nombre)
-                    or RE_ENTERO.match(nombre)
-                    or RE_DECIMAL.match(nombre)
-                    or RE_CADENA.match(nombre)
-                    or info.get("tipo") in ("SIMBOLO", "PALABRA_RESERVADA", "IDENTIFICADOR", "")):
+                or RE_ENTERO.match(nombre)
+                or RE_DECIMAL.match(nombre)
+                or RE_CADENA.match(nombre)
+                or info.get("tipo") in ("SIMBOLO", "PALABRA_RESERVADA", "IDENTIFICADOR", "")):
                 tabla_final[nombre] = {"tipo": info.get("tipo"), "valor": info.get("valor")}
             else:
                 if nombre.lower() in KEYWORDS or nombre in VALID_DECL_FORMS or nombre in INVALID_DECL_FORMS:
                     tabla_final[nombre] = {"tipo": info.get("tipo"), "valor": info.get("valor")}
-
-        # ordenar por nombre para presentación consistente
         tabla_final = dict(sorted(tabla_final.items(), key=lambda kv: kv[0]))
 
-        info_adicional = {
-            "tabla_simbolos": tabla_final,
-            "salida_ejecucion": salida_simulada
-        }
-
+        info_adicional = {"tabla_simbolos": tabla_final, "salida_ejecucion": salida_simulada}
         return self.errores, self.tokens, info_adicional
 
 # ----------------- API pública -----------------
@@ -319,16 +318,20 @@ def obtener_salida_ejecucion(info_adicional: Dict[str, Any]) -> List[str]:
 
 # ----------------- prueba rápida (opcional) -----------------
 if __name__ == "__main__":
-    ejemplo = r"""\ent mnmoi
-mnmoi = "hola";
-mnmoi = “hola curvy”;
-mnmCad = ‘texto simple’;
-\cad mnmCad;
+    ejemplo = r"""\ent mnmE; \dec mnmD; \cad mnmS;
+mnmE = 10;                 // OK
+mnmD = 100;                // OK -> 100.0
+mnmD = 2.5;                // OK
+mnmS = “hola”;             // OK (curvy)
+mnmE = “10”;               // ERROR: \ent no acepta cadenas
+mnmE = 33 + “1”;           // ERROR: expresión con cadena => incompatible con \ent
+mnmD = 33 + 7;             // OK (se infiere numérica, no se calcula)
+mnmS = 1 + “x”;            // ERROR: incompatible con \cad
 """
     errs, toks, info = analizar_codigo(ejemplo)
     print("ERRORES:")
     for e in errs:
         print(f"{e.token} | {e.lexema} | L{e.linea} | {e.mensaje}")
     print("\nTABLA SIMBOLOS:")
-    for k,v in info["tabla_simbolos"].items():
+    for k, v in info["tabla_simbolos"].items():
         print(k, v)

@@ -50,7 +50,7 @@ class CompiladorGUI:
         
     def setup_window(self):
         """Configuración inicial de la ventana"""
-        self.root.title("Compilador Minimalista - mnm Language")
+        self.root.title("Compilador - Lenguaje mnm ")
         self.root.geometry("1400x900")
         self.root.minsize(1200, 700)
         
@@ -246,8 +246,7 @@ class CompiladorGUI:
         self.error_tree.column('Descripción', width=300, anchor='w')
         
         # Scrollbar para la tabla de errores
-        error_scrollbar = ttk.Scrollbar(errors_frame, orient="vertical", 
-                                       command=self.error_tree.yview)
+        error_scrollbar = ttk.Scrollbar(errors_frame, orient="vertical", command=self.error_tree.yview)
         self.error_tree.configure(yscrollcommand=error_scrollbar.set)
         
         # Grid de la tabla
@@ -258,7 +257,7 @@ class CompiladorGUI:
         self.error_tree.bind('<Double-1>', self.ir_a_linea_error)
         
     def create_tokens_tab(self):
-        """Creamos la tabla de simbolos"""
+        """Crear la tabla de símbolos (CORREGIDA)"""
         tokens_frame = ttk.Frame(self.notebook)
         self.notebook.add(tokens_frame, text="🔤 Tabla de simbolos")
         
@@ -451,7 +450,7 @@ class CompiladorGUI:
                 if self.status_text:
                     self.status_text.set("Compilación exitosa - Código ejecutado")
                 if self.notebook:
-                    self.notebook.select(3)
+                    self.notebook.select(2)
                 
             self.update_status()
             
@@ -472,9 +471,9 @@ class CompiladorGUI:
         # Agregar errores
         for error in self.errores_actuales:
             self.error_tree.insert('', 'end', values=(
-                error.linea,
-                error.tipo.value,
                 error.token,
+                error.tipo.value,
+                error.linea,
                 error.mensaje
             ))
             
@@ -485,22 +484,23 @@ class CompiladorGUI:
                 self.text_editor.tag_add('error_line', line_start, line_end)
             
     def mostrar_tokens(self):
-        """Mostrar tokens en la tabla"""
+        """Mostrar tabla de símbolos (solo variables declaradas, sin duplicados) - CORREGIDO"""
         if not self.token_tree:
             return
-            
+
         # Limpiar tabla anterior
         for item in self.token_tree.get_children():
             self.token_tree.delete(item)
-            
-        # Agregar tokens
-        for token in self.tokens_actuales:
-            self.token_tree.insert('', 'end', values=(
-                token.lexema,
-                token.tipo,
-                token.linea,
-                token.descripcion
-            ))
+
+        # Obtener tabla de símbolos desde info_adicional
+        tabla_simbolos = self.info_adicional.get('tabla_simbolos', {})
+        
+        # Mostrar solo las variables declaradas (sin duplicados)
+        for nombre, info in tabla_simbolos.items():
+            tipo_dato = info.get('tipo', '')
+            # Insertar solo el nombre de la variable y su tipo
+            self.token_tree.insert('', 'end', values=(nombre, tipo_dato))
+
             
     def mostrar_tabla_simbolos(self):
         """Mostrar tabla de símbolos"""
@@ -553,7 +553,7 @@ class CompiladorGUI:
         selection = self.error_tree.selection()
         if selection:
             item = self.error_tree.item(selection[0])
-            linea = int(item['values'][0])
+            linea = int(item['values'][2])  # Cambié de índice 0 a 2 (Renglón)
             
             # Ir a la línea
             self.text_editor.mark_set('insert', f"{linea}.0")
@@ -604,18 +604,14 @@ class CompiladorGUI:
         if not self.text_editor:
             return
             
-        ejemplo = """/ent mnmX = 5
-/dec mnmY = 2.5
-/ent mnmZ = mnmX + 3
-/cad mnmSaludo = "Hola mundo"
-/cad mnmMensaje = mnmSaludo + " desde mnm"
-
-for mnmI in range(mnmX):
-    print("mnmMensaje");
-    print("mnmI");
-
-/ent mnmResultado = mnmZ * 2
-print("mnmResultado");"""
+        ejemplo = """/ent mnmX , mnmoi;
+/dec mnmY = 2.5;
+/ent mnmZ = mnmX;
+/cad mnmSaludo = "Hola mundo";
+print("mnmSaludo");
+print(mnmX);
+mnm_val1
+for mnmoi in range (5)"""
 
         try:
             # Limpiar editor y agregar ejemplo
@@ -654,5 +650,3 @@ def main():
         
 if __name__ == "__main__":
     main()
-    
-    

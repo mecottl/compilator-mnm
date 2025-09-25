@@ -11,7 +11,7 @@ RE_DECIMAL = re.compile(r'^\d+\.\d+$')
 RE_CADENA = re.compile(r'^".*"$')
 
 # Aceptamos formas \ent y /ent, etc.
-RESERVED_DECL = {"\\ent", "/ent", "\\dec", "/dec", "\\cad", "/cad"}
+RESERVED_DECL = {"\\ent", "\\dec", "\\cad"}
 
 # Palabras clave adicionales que quieres ver en la tabla
 KEYWORDS = {"print", "for", "in", "range"}
@@ -115,7 +115,11 @@ class CompiladorMinimalista:
                 elif p_lower in KEYWORDS:
                     tipo_token = "PALABRA_RESERVADA"
                 elif RE_IDENTIFICADOR.match(p):
-                    tipo_token = "IDENTIFICADOR"
+                    # Verificar que no sea una palabra reservada de tipo
+                    if p in {"/ent", "/cad", "/dec", "\\ent", "\\cad", "\\dec"}:
+                        self._add_error(ErrorType.SEMANTICO, idx, f"No se permite usar '{p}' como identificador", lexema=p)
+                    else:
+                        tipo_token = "IDENTIFICADOR"
                 elif RE_ENTERO.match(p):
                     tipo_token = "CONSTANTE_ENTERA"
                 elif RE_DECIMAL.match(p):
@@ -135,16 +139,16 @@ class CompiladorMinimalista:
                 # - registrar constantes literales con su tipo y valor
                 # - identificadores se registran cuando se declaran o se asignan (más abajo)
                 if tipo_token == "SIMBOLO":
-                    registrar_en_tabla(p, "SIMBOLO", None)
+                    registrar_en_tabla(p, "", None)
                 elif tipo_token == "PALABRA_RESERVADA":
                     # normalizar la forma que mostramos en tabla: usar la misma cadena p
-                    registrar_en_tabla(p, "PALABRA_RESERVADA", None)
+                    registrar_en_tabla(p, "", None)
                 elif tipo_token == "CONSTANTE_ENTERA":
-                    registrar_en_tabla(p, "/ent", int(p))
+                    registrar_en_tabla(p, "\ent", int(p))
                 elif tipo_token == "CONSTANTE_DECIMAL":
-                    registrar_en_tabla(p, "/dec", float(p))
+                    registrar_en_tabla(p, "\dec", float(p))
                 elif tipo_token == "CONSTANTE_CADENA":
-                    registrar_en_tabla(p, "/cad", p[1:-1])
+                    registrar_en_tabla(p, "\cad", p[1:-1])
                 # no registrar IDENTIFICADOR aquí por aparición casual (evitar "ensuciar" la tabla)
                 # los IDENTIFICADOR se registran al declararse o asignarse
 
@@ -163,7 +167,7 @@ class CompiladorMinimalista:
                     else:
                         declarados[nombre] = tipo_decl
                         # registrar el identificador y la palabra reservada en tabla_simbolos
-                        registrar_en_tabla(parts[0], "PALABRA_RESERVADA", None)
+                        registrar_en_tabla(parts[0], "", None)
                         registrar_en_tabla(nombre, tipo_decl, None)
                 continue
 
@@ -244,7 +248,7 @@ class CompiladorMinimalista:
                 if isinstance(tok, str):
                     tl = tok.lower()
                     if tl in KEYWORDS:
-                        registrar_en_tabla(tok, "PALABRA_RESERVADA", None)
+                        registrar_en_tabla(tok, "", None)
 
                 # ya tokenizamos constantes y símbolos más arriba
 
@@ -279,10 +283,9 @@ class CompiladorMinimalista:
                     or RE_ENTERO.match(nombre)
                     or RE_DECIMAL.match(nombre)
                     or RE_CADENA.match(nombre)
-                    or info.get("tipo") in ("SIMBOLO", "PALABRA_RESERVADA", "IDENTIFICADOR")):
+                    or info.get("tipo") in ("SIMBOLO", "PALABRA_RESERVADA", "IDENTIFICADOR", "")):  # <-- agrega "" aquí
                 tabla_final[nombre] = {"tipo": info.get("tipo"), "valor": info.get("valor")}
             else:
-                # para seguridad, si el lexema es una palabra clave en KEYWORDS o una reserved decl, lo incluimos
                 if nombre.lower() in KEYWORDS or nombre in RESERVED_DECL:
                     tabla_final[nombre] = {"tipo": info.get("tipo"), "valor": info.get("valor")}
                 # de otro modo se descarta (raro)

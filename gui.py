@@ -238,18 +238,18 @@ class CompiladorGUI:
         error_label.grid(row=0, column=0, sticky="w", padx=5, pady=5)
 
         # Tabla de errores
-        columns = ('Token', 'Tipo', 'Renglón', 'Descripción')
+        columns = ('Token', 'Lexema', 'Renglón', 'Descripción')
         self.error_tree = ttk.Treeview(errors_frame, columns=columns, show='headings',
                                        style='Custom.Treeview')
 
         # Configurar columnas
         self.error_tree.heading('Token', text='Token')
-        self.error_tree.heading('Tipo', text='Tipo')
+        self.error_tree.heading('Lexema', text='Lexema')
         self.error_tree.heading('Renglón', text='Renglón')
         self.error_tree.heading('Descripción', text='Descripción')
 
         self.error_tree.column('Token', width=60, anchor='center')
-        self.error_tree.column('Tipo', width=120, anchor='center')
+        self.error_tree.column('Lexema', width=120, anchor='center')
         self.error_tree.column('Renglón', width=80, anchor='center')
         self.error_tree.column('Descripción', width=400, anchor='w')
 

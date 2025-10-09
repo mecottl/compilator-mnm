@@ -125,7 +125,7 @@ class ResultsPanel:
             output_frame,
             wrap=tk.WORD,
             font=('Consolas', 10),
-            background=self.colors['bg_secondary'],
+            background=self.colors['bg_editor'],
             foreground=self.colors['success'],
             state='disabled',
             relief='flat'

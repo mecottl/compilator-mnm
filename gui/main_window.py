@@ -45,7 +45,7 @@ class MainWindow:
             pass
         
         # Fondo general oscuro
-        self.root.configure(bg="#ff0000")
+        # self.root.configure(bg="#050404")
         
         # Hacer redimensionable
         self.root.rowconfigure(0, weight=1)
@@ -57,7 +57,7 @@ class MainWindow:
         self.styles.setup_ttk_styles(style)
         
         # === 🎨 Personalización del fondo general ===
-        fondo_general = "#ff0000"  # Color de fondo oscuro tipo VS Code
+        fondo_general = "#683144"  # Color de fondo oscuro tipo VS Code
         
         # Aplica color a los principales contenedores
         style.configure("TFrame", background=fondo_general)

@@ -37,7 +37,7 @@ class EditorPanel:
         self.line_numbers = tk.Text(
             editor_frame, width=4, padx=3, takefocus=0,
             border=0, state='disabled', wrap='none',
-            background=self.colors['bg_secondary'],
+            background=self.colors['bg_editor'],
             foreground=self.colors['fg_secondary'],
             font=('Consolas', 11)
         )
@@ -48,7 +48,7 @@ class EditorPanel:
             editor_frame,
             wrap=tk.NONE,
             font=('Consolas', 11),
-            background=self.colors['bg_secondary'],
+            background=self.colors['bg_editor'],
             foreground=self.colors['fg_text'],
             insertbackground=self.colors['fg_text'],
             selectbackground=self.colors['accent'],

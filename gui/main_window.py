@@ -13,7 +13,6 @@ class MainWindow:
     def __init__(self, root):
         self.root = root
         self.styles = AppStyles()
-        
         # Variables de estado
         self.errores_actuales = []
         self.tokens_actuales = []
@@ -45,6 +44,9 @@ class MainWindow:
         except:
             pass
         
+        # Fondo general oscuro
+        self.root.configure(bg="#ff0000")
+        
         # Hacer redimensionable
         self.root.rowconfigure(0, weight=1)
         self.root.columnconfigure(0, weight=1)
@@ -53,6 +55,23 @@ class MainWindow:
         """Configuración de estilos"""
         style = ttk.Style()
         self.styles.setup_ttk_styles(style)
+        
+        # === 🎨 Personalización del fondo general ===
+        fondo_general = "#ff0000"  # Color de fondo oscuro tipo VS Code
+        
+        # Aplica color a los principales contenedores
+        style.configure("TFrame", background=fondo_general)
+        style.configure("TPanedwindow", background=fondo_general)
+        style.configure("TNotebook", background=fondo_general)
+        style.configure("TNotebook.Tab", background=fondo_general)
+        style.configure("CustomPaned.TPanedwindow", background=fondo_general)
+        
+        # Opcional: estilo para etiquetas y botones (tema oscuro)
+        style.configure("TLabel", background=fondo_general, foreground="white")
+        style.configure("TButton", background="#2d2d2d", foreground="white")
+        style.map("TButton",
+                  background=[("active", "#3c3c3c")],
+                  foreground=[("active", "white")])
     
     def _create_widgets(self):
         """Crea todos los widgets de la interfaz"""
@@ -94,7 +113,7 @@ class MainWindow:
     
     def _create_content_area(self, parent):
         """Crea el área principal de contenido"""
-        paned_window = ttk.PanedWindow(parent, orient=tk.HORIZONTAL)
+        paned_window = ttk.PanedWindow(parent, orient=tk.HORIZONTAL, style="CustomPaned.TPanedwindow")
         paned_window.grid(row=1, column=0, sticky="nsew")
         
         # Panel izquierdo - Editor

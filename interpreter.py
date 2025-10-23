@@ -2,7 +2,7 @@
 from symbol_table import SymbolTable
 from evaluator import Evaluator
 from error_handler import ErrorHandler
-from constants import VALID_DECL_FORMS
+from constants import VALID_DECL_FORMS, RE_IDENTIFICADOR, CANONICAL_FROM_DECL
 
 class Interpreter:
     """Ejecuta el código estructurado (con bloques)"""
@@ -18,11 +18,9 @@ class Interpreter:
     def execute(self, tokens_por_linea: list[list[str]]) -> list[str]:
         """Punto de entrada para la ejecución"""
         self.output = []
-        # Aplanamos los tokens por línea a una lista de (num_linea, tokens)
         self.lines_tokens = list(enumerate(tokens_por_linea, start=1))
         self.line_cursor = 0
         
-        # Ejecutamos el "ámbito global"
         self._execute_block(stop_at_line=len(self.lines_tokens) + 1)
         
         return self.output
@@ -30,16 +28,14 @@ class Interpreter:
     def _execute_block(self, stop_at_line: int):
         """
         Ejecuta un bloque de código, línea por línea, hasta
-        encontrar 'stop_at_line' (usado para delimitar el cuerpo de un 'for').
+        encontrar 'stop_at_line'.
         """
         while self.line_cursor < len(self.lines_tokens) and self.line_cursor + 1 < stop_at_line:
             linea, parts = self.lines_tokens[self.line_cursor]
-            self.line_cursor += 1 # Avanzamos ANTES de procesar
+            self.line_cursor += 1
             
             if not parts:
                 continue
-            
-            # --- Lógica de Instrucciones ---
             
             # 1. Instrucción FOR
             if parts[0] == "for":
@@ -47,9 +43,7 @@ class Interpreter:
                 continue
                 
             # 2. Instrucción de ASIGNACIÓN (simple)
-            # (El analizador semántico ya manejó las declaraciones)
-            if "=" in parts and parts[0] not in VALID_DECL_FORMS: # (Necesitarías importar VALID_DECL_FORMS)
-                 # Asumimos que es una asignación simple, ej: mnmx = mnmx + 1
+            if "=" in parts and parts[0] not in VALID_DECL_FORMS:
                  self._execute_assignment(linea, parts)
                  continue
 
@@ -58,7 +52,43 @@ class Interpreter:
                 self._execute_print(linea, parts)
                 continue
                 
-            # (Omitimos declaraciones, ya las procesó el semantic_analyzer)
+            # (Omitimos declaraciones)
+
+    def _execute_for_init(self, linea: int, init_tokens: list[str]):
+        """Ejecuta la sección de inicialización de un bucle 'for'."""
+        if not init_tokens:
+            return
+
+        # Caso 1: Es una declaración (ej: \ent mnmI = 1)
+        if init_tokens[0] in VALID_DECL_FORMS:
+            try:
+                tipo_str = init_tokens[0]
+                tipo_canon = CANONICAL_FROM_DECL[tipo_str]
+                var_name = init_tokens[1]
+                
+                if not RE_IDENTIFICADOR.match(var_name):
+                    raise SyntaxError(f"Identificador inválido en declaración de 'for': {var_name}")
+                
+                if self.symbol_table.esta_declarada(var_name):
+                    self.error_handler.add_error("SEMANTICO", linea, f"Duplicidad de variable en 'for'", var_name)
+                    return
+
+                self.symbol_table.declarar_variable(var_name, tipo_canon)
+                
+                if len(init_tokens) > 2 and init_tokens[2] == "=":
+                    expr_tokens = init_tokens[3:]
+                    if not expr_tokens:
+                        raise SyntaxError("Valor faltante en asignación de 'for'")
+                    
+                    value = self.evaluator.evaluate(expr_tokens, linea)
+                    self.symbol_table.actualizar_valor(var_name, value)
+                
+            except Exception as e:
+                self.error_handler.add_error("SINTACTICO", linea, f"Error en inicialización de 'for': {e}", " ".join(init_tokens))
+        
+        # Caso 2: Es una asignación simple (ej: mnmI = 1)
+        else:
+            self._execute_assignment(linea, init_tokens)
 
     def _execute_assignment(self, linea: int, parts: list[str]):
         """Ejecuta una asignación, ej: mnmx = mnmx + 1"""
@@ -71,11 +101,9 @@ class Interpreter:
                 self.error_handler.add_error("SEMANTICO", linea, f"Asignación a variable no declarada '{var_name}'", var_name)
                 return
             
-            # Usamos el evaluador
             value = self.evaluator.evaluate(expr_tokens, linea)
             
             if value is not None:
-                # (Aquí iría la comprobación de tipos, pero el evaluador ya la hace)
                 self.symbol_table.actualizar_valor(var_name, value)
                 
         except Exception as e:
@@ -84,27 +112,16 @@ class Interpreter:
     def _execute_for(self, linea: int, parts: list[str]):
         """Ejecuta un bucle FOR estilo C: for(init; cond; incr): { ... }"""
         
-        # 1. Parsear la cabecera del FOR: for( ... ; ... ; ... ): {
+        # 1. Parsear la cabecera del FOR
         try:
-            header_str = "".join(parts[1:]) # Une todo después de 'for'
-            
-            # Extraer las 3 partes
+            # (Tu lógica de parseo de la cabecera está aquí...)
+            header_str = "".join(parts[1:])
             if not header_str.startswith("(") or not header_str.endswith("):{"):
                 raise SyntaxError("Formato de 'for' inválido. Se esperaba 'for(init; cond; incr):{'")
             
-            content = header_str[1:-3] # Quita ( y ):{
-            
+            content = header_str[1:-3]
             init_str, cond_str, incr_str = content.split(";")
-            
-            # Convertir las partes a listas de tokens (esto es una simplificación,
-            # aquí deberíamos re-tokenizar)
-            # Asumimos que el lexer ya separó bien los tokens en 'parts'
-            # Esta parte es la más compleja. Necesitamos un parser de verdad.
-            
-            # --- SIMPLIFICACIÓN FORZADA ---
-            # Necesitamos encontrar los tokens exactos para init, cond, incr
-            # El 'parts' original: ['for', '(', 'mnmx', '=', '1', ';', 'mnmx', '<', '10', ';', 'mnmx', '=', 'mnmx', '+', '1', ')', ':', '{']
-            
+
             if parts[1] != "(":
                  raise SyntaxError("Falta '(' después de 'for'")
             
@@ -123,8 +140,8 @@ class Interpreter:
             self.error_handler.add_error("SINTACTICO", linea, f"Sintaxis de 'for' inválida: {e}", "for")
             return
 
-        # 2. Encontrar el cuerpo del bucle (la '}' correspondiente)
-        start_line_idx = self.line_cursor # La línea *después* del 'for'
+        # 2. Encontrar el cuerpo del bucle
+        start_line_idx = self.line_cursor
         body_end_line_idx = self._find_matching_brace(start_line_idx)
         
         if body_end_line_idx == -1:
@@ -133,72 +150,66 @@ class Interpreter:
             
         # 3. Ejecutar el bucle
         
+        # --- ¡INICIO DE LA CORRECCIÓN! ---
         # a. Ejecutar inicialización
-        self._execute_assignment(linea, init_tokens) # Reutilizamos la lógica de asignación
+        self._execute_for_init(linea, init_tokens)
+        # --- FIN DE LA CORRECCIÓN! ---
 
         # b. Iniciar el bucle de condición
         loop_count = 0
         while True:
-            if loop_count > 10000: # Límite de seguridad
+            if loop_count > 10000:
                  self.error_handler.add_error("SEMANTICO", linea, "Posible bucle infinito detectado", "for")
                  break
                  
             # c. Evaluar condición
             condition_result = self.evaluator.evaluate(cond_tokens, linea)
             if not condition_result:
-                break # Salir del bucle
+                break
 
             # d. Ejecutar el cuerpo del bucle
-            # Guardamos el cursor actual, ejecutamos el bloque, y restauramos
             cursor_before_body = self.line_cursor
-            self.line_cursor = start_line_idx # Apuntamos al inicio del cuerpo
+            self.line_cursor = start_line_idx
             self._execute_block(stop_at_line=body_end_line_idx)
-            self.line_cursor = cursor_before_body # Restauramos
+            self.line_cursor = cursor_before_body
             
             # e. Ejecutar incremento
-            self._execute_assignment(linea, incr_tokens) # Reutilizamos
+            self._execute_assignment(linea, incr_tokens)
             
             loop_count += 1
             
-        # 4. Mover el cursor principal para que salte el bloque del 'for'
+        # 4. Mover el cursor principal
         self.line_cursor = body_end_line_idx
 
     def _find_matching_brace(self, start_line_idx: int) -> int:
-        """Encuentra la '}' que cierra el bloque. Devuelve el índice de la línea *después* del '}'."""
+        """Encuentra la '}' que cierra el bloque."""
         nesting_level = 1
         cursor = start_line_idx
         
         while cursor < len(self.lines_tokens):
             _linea, parts = self.lines_tokens[cursor]
             
-            if "{" in parts: # (Esto es simplificado, idealmente es ':{' al final)
+            if "{" in parts:
                 nesting_level += 1
             
             if "}" in parts:
                 nesting_level -= 1
                 if nesting_level == 0:
-                    return cursor + 1 # Devolvemos la línea *siguiente*
+                    return cursor + 1
                     
             cursor += 1
         
-        return -1 # No se encontró
-    
-# ... (dentro de la clase Interpreter en interpreter.py) ...
+        return -1
 
     def _execute_print(self, linea: int, parts: list[str]):
-        """Ejecuta una instrucción print. Sintaxis: print(expresion) o print(expresion);"""
+        """Ejecuta una instrucción print. Sintaxis: print(expresion);"""
         
         try:
-            # --- ¡INICIO DE LA MODIFICACIÓN! ---
-            
-            # Copiamos la lista de tokens para no modificar la original
             clean_parts = list(parts)
             
-            # 1. Ignorar el punto y coma opcional al final
             if clean_parts and clean_parts[-1] == ";":
-                clean_parts.pop() # Elimina el ';'
+                clean_parts.pop()
             
-            # 2. Validar la sintaxis con los tokens limpios
             if not (len(clean_parts) >= 3 and clean_parts[1] == "(" and clean_parts[-1] == ")"):
                 self.error_handler.add_error(
                     "SINTACTICO", linea, 
@@ -207,17 +218,12 @@ class Interpreter:
                 )
                 return
 
-            # 3. Extraer la expresión (lo que está entre los paréntesis)
             expr_tokens = clean_parts[2:-1]
             
-            # --- FIN DE LA MODIFICACIÓN! ---
-
             if not expr_tokens:
-                # Caso: print() - Imprime una línea vacía
                 self.output.append("")
                 return
 
-            # Usamos el evaluador para calcular el resultado de la expresión
             value = self.evaluator.evaluate(expr_tokens, linea)
             
             if value is None:

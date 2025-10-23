@@ -25,5 +25,6 @@ def main():
         messagebox.showerror("Error Fatal", f"Error inesperado: {str(e)}")
         sys.exit(1)
 
+
 if __name__ == "__main__":
     main()

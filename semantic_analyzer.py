@@ -6,7 +6,7 @@ from error_handler import ErrorHandler
 from symbol_table import SymbolTable
 from constants import (
     RE_IDENTIFICADOR, RE_ENTERO, RE_DECIMAL, RE_CADENA,
-    VALID_DECL_FORMS, INVALID_DECL_FORMS, CANONICAL_FROM_DECL, CANONICAL_TO_SOURCE
+    VALID_DECL_FORMS, INVALID_DECL_FORMS, CANONICAL_FROM_DECL, CANONICAL_TO_SOURCE, VALID_SYMBOLS
 )
 
 
@@ -124,6 +124,10 @@ class SemanticAnalyzer:
             elif RE_CADENA.match(p):
                 self.symbol_table.registrar(p, "\\cad", p[1:-1])
 
+            elif p in VALID_SYMBOLS:
+                self.symbol_table.registrar(p, "", None)
+
+
     def _is_declaration(self, parts: List[str]) -> bool:
         """Verifica si la línea es una declaración"""
         return len(parts) > 0 and parts[0] in VALID_DECL_FORMS
@@ -213,9 +217,7 @@ class SemanticAnalyzer:
         
         lhs = parts[pos_eq - 1]
         rhs_tokens = self._extract_rhs(parts, pos_eq + 1)
-        
-        self.symbol_table.registrar("=", "", None)
-        
+                
         if not RE_IDENTIFICADOR.match(lhs):
             self.error_handler.add_error(
                 ErrorType.SEMANTICO, linea,

@@ -252,14 +252,16 @@ class MainWindow:
     
     def load_example(self):
         """Carga código de ejemplo"""
-        ejemplo = r"""\ent mnmX , mnmoi;
-\dec mnmY = 2.5;
-\ent mnmZ = mnmX;
-\cad mnmSaludo = "Hola mundo";
-print("mnmSaludo");
-print(mnmX);
-mnm_Invalida;
-for mnmoi in range (5)"""
+        ejemplo = r"""\ent mnmI = 0;
+
+print("--- Inicio del bucle ---");
+
+for(mnmI = 1; mnmI <= 3; mnmI = mnmI + 1):{
+    print("Iteracion numero:");
+    print(mnmI);
+}
+
+print("--- Fin del bucle ---");"""
         
         self.editor_panel.set_code(ejemplo)
         self.status_text.set("Ejemplo cargado - Presiona 'Compilar' para probar")

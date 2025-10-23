@@ -6,7 +6,7 @@ class AppStyles:
         self.colors = {
             'bg_editor': '#80445b',   # bg del editor
             'fg_text': "#fff",           # color texto
-            'fg_title': "#ff0000",       # color para títulos
+            'fg_title': "#fff",       # color para títulos
             'fg_secondary': '#FB5C87',   # color numero de linea
             'accent': '#43a047',         # color para seleccionar
             'error': '#B8052B',          # Rojo para errores en editor

@@ -263,10 +263,30 @@ class SemanticAnalyzer:
             
             # Buscar lexema a mostrar
             show_lex = None
-            for t in rhs_tokens:
-                if RE_CADENA.match(t):
-                    show_lex = t
-                    break
+            
+            if rhs_tipo == "/cad":
+                for t in rhs_tokens:
+                    if RE_CADENA.match(t):
+                        show_lex = t
+                        break
+                    
+            if show_lex is None and rhs_tipo == "/dec":
+                for t in rhs_tokens:
+                    if RE_DECIMAL.match(t):
+                        show_lex = t
+                        break
+                    
+            if show_lex is None and lhs_tipo == "/ent":
+                for t in rhs_tokens:
+                    if RE_DECIMAL.match(t):
+                        show_lex = t
+                        break
+                
+            if show_lex is None and lhs_tipo == "/cad":
+                for t in rhs_tokens:
+                    if not RE_CADENA.match(t):
+                        show_lex = t
+                        break
             
             if show_lex is None and rhs_tokens:
                 show_lex = rhs_tokens[0]

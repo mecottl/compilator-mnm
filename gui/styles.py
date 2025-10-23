@@ -1,19 +1,16 @@
-# gui/styles.py - Estilos y colores de la interfaz
 from tkinter import ttk
 
-
 class AppStyles:
-    """Gestiona los estilos visuales de la aplicación"""
     
     def __init__(self):
         self.colors = {
-            'bg_editor': '#80445b',   # Verde medio
-            'fg_text': "#fff",           # Blanco para texto
-            'fg_title': "#ffffff",       # Verde oscuro para títulos
-            'fg_secondary': '#FB5C87',   # Verde pálido para secundarios
-            'accent': '#43a047',         # Verde acento
-            'error': '#B8052B',          # Rojo para errores
-            'success': "#ffffff",        # Blanco para éxito
+            'bg_editor': '#80445b',   # bg del editor
+            'fg_text': "#fff",           # color texto
+            'fg_title': "#ff0000",       # color para títulos
+            'fg_secondary': '#FB5C87',   # color numero de linea
+            'accent': '#43a047',         # color para seleccionar
+            'error': '#B8052B',          # Rojo para errores en editor
+            'success': "#ffffff",        # Blanco para éxito en salida
             'warning': '#ffa726'         # Naranja para advertencias
         }
     

@@ -37,29 +37,19 @@ class MainWindow:
         self.root.title("mnmCompilador")
         self.root.geometry("1400x900")
         self.root.minsize(1200, 700)
-        
-        # Intentar cargar icono
+        self.root.rowconfigure(0, weight=1)
+        self.root.columnconfigure(0, weight=1)
         try:
             self.root.iconbitmap("icon.ico")
         except:
             pass
-        
-        # Fondo general oscuro
-        # self.root.configure(bg="#050404")
-        
-        # Hacer redimensionable
-        self.root.rowconfigure(0, weight=1)
-        self.root.columnconfigure(0, weight=1)
     
     def _setup_styles(self):
         """Configuración de estilos"""
         style = ttk.Style()
         self.styles.setup_ttk_styles(style)
+        fondo_general = "#683144"  
         
-        # === 🎨 Personalización del fondo general ===
-        fondo_general = "#683144"  # Color de fondo oscuro tipo VS Code
-        
-        # Aplica color a los principales contenedores
         style.configure("TFrame", background=fondo_general)
         style.configure("TPanedwindow", background=fondo_general)
         style.configure("TNotebook", background=fondo_general)

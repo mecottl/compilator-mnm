@@ -83,7 +83,7 @@ class MainWindow:
         
         # Título
         title_label = ttk.Label(header_frame, text="mnmCompilador",
-                               style='Title.TLabel')
+                              style='Title.TLabel')
         title_label.grid(row=0, column=0, sticky="w")
         
         # Botones
@@ -91,13 +91,13 @@ class MainWindow:
         button_frame.grid(row=0, column=1, sticky="e")
         
         ttk.Button(button_frame, text="Compilar",
-                  command=self.compile_code).grid(row=0, column=0, padx=2)
+                   command=self.compile_code).grid(row=0, column=0, padx=2)
         
         ttk.Button(button_frame, text="Limpiar",
-                  command=self.clear_all).grid(row=0, column=1, padx=2)
+                   command=self.clear_all).grid(row=0, column=1, padx=2)
         
         ttk.Button(button_frame, text="Ejemplo",
-                  command=self.load_example).grid(row=0, column=2, padx=2)
+                   command=self.load_example).grid(row=0, column=2, padx=2)
         
         header_frame.columnconfigure(1, weight=1)
     
@@ -232,6 +232,12 @@ class MainWindow:
         # Mostrar salida
         salida = self.info_adicional.get('salida_ejecucion', [])
         self.results_panel.show_output(salida, len(self.errores_actuales) > 0)
+        
+        # --- ¡INICIO DE LA MODIFICACIÓN! ---
+        # Mostrar triplos
+        lista_triplos = self.info_adicional.get('lista_triplos', [])
+        self.results_panel.show_triplos(lista_triplos)
+        # --- FIN DE LA MODIFICACIÓN! ---
     
     def clear_all(self):
         """Limpia todo el contenido"""

@@ -135,29 +135,27 @@ class ResultsPanel:
         self.output_text.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
     
     def create_triploss_tab(self):
-        """Crea la pestaña de triplos"""
         triplos_frame = ttk.Frame(self.notebook)
-        self.notebook.add(triplos_frame, text="🔁 Triplos")
+        self.notebook.add(triplos_frame, text=" Triplos")
         
         # Configurar grid
         triplos_frame.rowconfigure(1, weight=1)
         triplos_frame.columnconfigure(0, weight=1)
         
         # Etiqueta
-        triplos_label = ttk.Label(triplos_frame, text="Lista de triplos (índice, operador, arg1, arg2, resultado):",
+        triplos_label = ttk.Label(triplos_frame, text="Lista de triplos (índice, operador, arg1, arg2):",
                                  style='Title.TLabel')
-        triplos_label.grid(row=0, column=0, sticky="w", padx=5, pady=5)
+        triplos_label.grid(row=0, column=0, sticky="w", padx=4, pady=4)
         
         # Tabla de triplos
-        columns = ('#', 'Operador', 'Arg1', 'Arg2', 'Resultado')
+        columns = ('#', 'Operador', 'Arg1', 'Arg2')
         self.triple_tree = ttk.Treeview(triplos_frame, columns=columns,
                                         show='headings', style='Custom.Treeview')
         
         for col, w, anchor in (('#', 60, 'center'),
                                ('Operador', 120, 'center'),
                                ('Arg1', 120, 'center'),
-                               ('Arg2', 120, 'center'),
-                               ('Resultado', 180, 'w')):
+                               ('Arg2', 120, 'center')):
             self.triple_tree.heading(col, text=col)
             self.triple_tree.column(col, width=w, anchor=anchor)
         
@@ -167,8 +165,33 @@ class ResultsPanel:
         self.triple_tree.configure(yscrollcommand=triple_scrollbar.set)
         
         # Grid
-        self.triple_tree.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
-        triple_scrollbar.grid(row=1, column=1, sticky="ns", pady=5)
+        self.triple_tree.grid(row=1, column=0, sticky="nsew", padx=4, pady=5)
+        triple_scrollbar.grid(row=1, column=1, sticky="ns", pady=4)
+        
+    def show_triplos(self, lista_triplos: List[tuple]):
+        """Muestra la lista de triplos en la tabla"""
+        
+        # 1. Limpiar tabla (si existe)
+        if not self.triple_tree:
+            return
+            
+        for item in self.triple_tree.get_children():
+            self.triple_tree.delete(item)
+        
+        # 2. Agregar triplos
+        # El generador nos da una lista de tuplas (op, arg1, arg2)
+        for idx, triplo in enumerate(lista_triplos, start=1):
+            op, arg1, arg2 = triplo
+            
+            # Convertir 'None' a una cadena vacía para mostrarlo
+            arg2_display = arg2 if arg2 is not None else ""
+            
+            self.triple_tree.insert('', 'end', values=(
+                idx,           # Columna '#'
+                op,            # Columna 'Operador'
+                arg1,          # Columna 'Arg1'
+                arg2_display   # Columna 'Arg2'
+            ))
 
     def show_errors(self, errores: List[Error]):
         """Muestra errores en la tabla"""

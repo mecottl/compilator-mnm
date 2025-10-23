@@ -342,10 +342,29 @@ class SemanticAnalyzer:
             tipo_fuente = CANONICAL_TO_SOURCE.get(lhs_tipo, lhs_tipo)
             
             show_lex = None
-            for t in rhs_tokens:
-                if RE_CADENA.match(t) or RE_DECIMAL.match(t) or RE_ENTERO.match(t) or RE_IDENTIFICADOR.match(t):
-                    show_lex = t
-                    break
+            if rhs_tipo == "/cad":
+                for t in rhs_tokens:
+                    if RE_CADENA.match(t):
+                        show_lex = t
+                        break
+                    
+            if show_lex is None and rhs_tipo == "/dec":
+                for t in rhs_tokens:
+                    if RE_DECIMAL.match(t):
+                        show_lex = t
+                        break
+                    
+            if show_lex is None and lhs_tipo == "/ent":
+                for t in rhs_tokens:
+                    if RE_DECIMAL.match(t):
+                        show_lex = t
+                        break
+                
+            if show_lex is None and lhs_tipo == "/cad":
+                for t in rhs_tokens:
+                    if not RE_CADENA.match(t):
+                        show_lex = t
+                        break
             
             if show_lex is None and rhs_tokens:
                 show_lex = rhs_tokens[0]

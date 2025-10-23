@@ -17,6 +17,7 @@ class ResultsPanel:
         self.error_tree = None
         self.token_tree = None
         self.output_text = None
+        self.triple_tree = None   # <-- añadido
         
         self._create_widgets()
     
@@ -30,6 +31,7 @@ class ResultsPanel:
         self._create_errors_tab()
         self._create_tokens_tab()
         self._create_output_tab()
+        self.create_triploss_tab() # pestaña de triplos
     
     def _create_errors_tab(self):
         """Crea la pestaña de errores"""
@@ -132,6 +134,42 @@ class ResultsPanel:
         )
         self.output_text.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
     
+    def create_triploss_tab(self):
+        """Crea la pestaña de triplos"""
+        triplos_frame = ttk.Frame(self.notebook)
+        self.notebook.add(triplos_frame, text="🔁 Triplos")
+        
+        # Configurar grid
+        triplos_frame.rowconfigure(1, weight=1)
+        triplos_frame.columnconfigure(0, weight=1)
+        
+        # Etiqueta
+        triplos_label = ttk.Label(triplos_frame, text="Lista de triplos (índice, operador, arg1, arg2, resultado):",
+                                 style='Title.TLabel')
+        triplos_label.grid(row=0, column=0, sticky="w", padx=5, pady=5)
+        
+        # Tabla de triplos
+        columns = ('#', 'Operador', 'Arg1', 'Arg2', 'Resultado')
+        self.triple_tree = ttk.Treeview(triplos_frame, columns=columns,
+                                        show='headings', style='Custom.Treeview')
+        
+        for col, w, anchor in (('#', 60, 'center'),
+                               ('Operador', 120, 'center'),
+                               ('Arg1', 120, 'center'),
+                               ('Arg2', 120, 'center'),
+                               ('Resultado', 180, 'w')):
+            self.triple_tree.heading(col, text=col)
+            self.triple_tree.column(col, width=w, anchor=anchor)
+        
+        # Scrollbar
+        triple_scrollbar = ttk.Scrollbar(triplos_frame, orient="vertical",
+                                         command=self.triple_tree.yview)
+        self.triple_tree.configure(yscrollcommand=triple_scrollbar.set)
+        
+        # Grid
+        self.triple_tree.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+        triple_scrollbar.grid(row=1, column=1, sticky="ns", pady=5)
+
     def show_errors(self, errores: List[Error]):
         """Muestra errores en la tabla"""
         # Limpiar tabla
@@ -192,11 +230,16 @@ class ResultsPanel:
         for item in self.token_tree.get_children():
             self.token_tree.delete(item)
         
+        # Limpiar triplos (si existe)
+        if self.triple_tree:
+            for item in self.triple_tree.get_children():
+                self.triple_tree.delete(item)
+        
         # Limpiar salida
         self.output_text.config(state='normal')
         self.output_text.delete('1.0', 'end')
         self.output_text.config(state='disabled')
-    
+
     def select_tab(self, index: int):
         """Selecciona una pestaña por índice"""
         self.notebook.select(index)

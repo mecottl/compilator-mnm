@@ -29,3 +29,10 @@ class Error:
     linea: int
     mensaje: str
     lexema: Optional[str] = None
+    
+@dataclass
+class Triplo:
+    idx: int
+    dato_objeto: str
+    dato_fuente: str
+    operador: str

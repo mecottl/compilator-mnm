@@ -1,4 +1,5 @@
 # semantic_analyzer.py - Análisis semántico
+
 from typing import List, Tuple, Optional, Any
 from models import ErrorType
 from error_handler import ErrorHandler
@@ -11,41 +12,108 @@ from constants import (
 
 class SemanticAnalyzer:
     """Analizador semántico - verifica tipos y declaraciones"""
-    
+
     def __init__(self, error_handler: ErrorHandler, symbol_table: SymbolTable):
         self.error_handler = error_handler
         self.symbol_table = symbol_table
-    
+
     def analyze(self, tokens_por_linea: List[List[str]]):
-        """
-        Analiza la semántica del código
-        
-        Args:
-            tokens_por_linea: Lista de tokens por cada línea
-        """
-        for idx, parts in enumerate(tokens_por_linea, start=1):
+        """Analiza la semántica del código (Versión 2, soporta bloques)"""
+        line_index = 0
+        while line_index < len(tokens_por_linea):
+            linea_actual = line_index + 1
+            parts = tokens_por_linea[line_index]
+            
             if not parts:
+                line_index += 1
                 continue
             
-            # Procesar tokens básicos
-            self._process_basic_tokens(parts, idx)
+            self._process_basic_tokens(parts, linea_actual)
             
-            # Analizar declaraciones
-            if self._is_declaration(parts):
-                self._analyze_declaration(parts, idx)
+            # 1. Es un 'for'?
+            if self._is_for_loop(parts):
+                if not (len(parts) > 2 and parts[-1] == "{" and parts[-2] == ":"):
+                    self.error_handler.add_error(
+                        ErrorType.SINTACTICO, linea_actual,
+                        "El 'for' debe terminar en '):{'", " ".join(parts)
+                    )
+                    line_index += 1
+                    continue
+                
+                end_brace_line_idx = self._find_matching_brace(tokens_por_linea, line_index + 1)
+                
+                if end_brace_line_idx == -1:
+                    self.error_handler.add_error(
+                        ErrorType.SINTACTICO, linea_actual,
+                        "No se encontró '}' para el 'for'", "for"
+                    )
+                    line_index += 1
+                    continue
+                
+                # Saltamos el cursor al final del bloque
+                line_index = end_brace_line_idx + 1
                 continue
-            
-            # Analizar declaraciones inválidas
+
+            # 2. Es una declaración inválida?
             if self._is_invalid_declaration(parts):
+                line_index += 1
+                continue
+
+            # 3. Es una declaración válida?
+            if self._is_declaration(parts):
+                self._analyze_declaration(parts, linea_actual)
+                line_index += 1
+                continue
+                
+            # 4. Es una asignación?
+            if self._is_assignment(parts):
+                self._analyze_assignment(parts, linea_actual)
+                line_index += 1
                 continue
             
-            # Analizar asignaciones
-            if "=" in parts:
-                self._analyze_assignment(parts, idx)
+            # 5. Es un 'print'?
+            if parts[0] == "print":
+                line_index += 1
+                continue
+
+            # 6. Es una línea '}' suelta?
+            if parts == ["}"]:
+                self.error_handler.add_error(
+                    ErrorType.SINTACTICO, linea_actual,
+                    "'}' inesperado fuera de un bloque", "}"
+                )
+                line_index += 1
+                continue
+
+            # 7. Si no es nada de lo anterior, checar variables
+            self._check_undeclared_variables(parts, linea_actual)
             
-            # Verificar variables no declaradas
-            self._check_undeclared_variables(parts, idx)
-    
+            line_index += 1
+
+    def _find_matching_brace(self, tokens_por_linea: List[List[str]], start_line_idx: int) -> int:
+        """Encuentra el '}' que cierra un bloque."""
+        nesting_level = 1
+        cursor = start_line_idx
+        
+        while cursor < len(tokens_por_linea):
+            parts = tokens_por_linea[cursor]
+            
+            if "{" in parts:
+                nesting_level += 1
+            
+            if "}" in parts:
+                nesting_level -= 1
+                if nesting_level == 0:
+                    return cursor
+                    
+            cursor += 1
+        
+        return -1 # No se encontró
+
+    def _is_for_loop(self, parts: List[str]) -> bool:
+        """Verifica si la línea es una cabecera de 'for'"""
+        return parts and parts[0] == "for"
+
     def _process_basic_tokens(self, parts: List[str], linea: int):
         """Procesa tokens básicos y los registra en la tabla"""
         for p in parts:
@@ -55,17 +123,17 @@ class SemanticAnalyzer:
                 self.symbol_table.registrar(p, "\\dec", float(p))
             elif RE_CADENA.match(p):
                 self.symbol_table.registrar(p, "\\cad", p[1:-1])
-    
+
     def _is_declaration(self, parts: List[str]) -> bool:
         """Verifica si la línea es una declaración"""
         return len(parts) > 0 and parts[0] in VALID_DECL_FORMS
-    
+
     def _is_invalid_declaration(self, parts: List[str]) -> bool:
         """Verifica si la línea usa declaración inválida"""
         if len(parts) > 0 and parts[0] in INVALID_DECL_FORMS:
             return True
         return False
-    
+
     def _analyze_declaration(self, parts: List[str], linea: int):
         """Analiza una declaración de variable"""
         first = parts[0]
@@ -83,7 +151,6 @@ class SemanticAnalyzer:
             if RE_IDENTIFICADOR.match(tok):
                 nombre = tok
                 
-                # Verificar duplicidad
                 if self.symbol_table.esta_declarada(nombre):
                     self.error_handler.add_error(
                         ErrorType.SEMANTICO, linea,
@@ -98,31 +165,42 @@ class SemanticAnalyzer:
                     rhs_tokens = self._extract_rhs(parts, j + 1)
                     rhs_tipo, rhs_valor = self._inferir_tipo_y_valor(rhs_tokens)
                     
-                    # Verificar compatibilidad
                     if rhs_tipo is not None:
                         self._check_type_compatibility(
                             tipo_decl, rhs_tipo, rhs_tokens, linea, nombre
                         )
                         
-                        # Almacenar valor si es compatible
-                        if rhs_valor is not None:
-                            if tipo_decl == "/dec" and rhs_tipo == "/ent":
-                                self.symbol_table.actualizar_valor(nombre, float(rhs_valor))
-                            else:
-                                self.symbol_table.actualizar_valor(nombre, rhs_valor)
+                    if rhs_valor is not None:
+                        rhs_tipo_norm = CANONICAL_FROM_DECL.get(rhs_tipo, rhs_tipo)
+                        
+                        if tipo_decl == "/dec" and rhs_tipo_norm == "/ent":
+                            self.symbol_table.actualizar_valor(nombre, float(rhs_valor))
+                        elif tipo_decl == rhs_tipo_norm:
+                            self.symbol_table.actualizar_valor(nombre, rhs_valor)
                     
-                    # Saltar tokens procesados
                     pos = self._skip_to_delimiter(parts, j + 1)
                 else:
                     pos += 1
                 
-                # Continuar si hay coma
                 if pos < len(parts) and parts[pos] == ",":
                     pos += 1
                 continue
             
             pos += 1
-    
+
+    def _is_assignment(self, parts: List[str]) -> bool:
+        """Verifica si la línea es una asignación."""
+        if "=" not in parts:
+            return False
+        
+        if self._is_declaration(parts):
+            return False
+            
+        if RE_IDENTIFICADOR.match(parts[0]):
+             return True
+             
+        return False
+
     def _analyze_assignment(self, parts: List[str], linea: int):
         """Analiza una asignación"""
         try:
@@ -138,7 +216,6 @@ class SemanticAnalyzer:
         
         self.symbol_table.registrar("=", "", None)
         
-        # Validar LHS
         if not RE_IDENTIFICADOR.match(lhs):
             self.error_handler.add_error(
                 ErrorType.SEMANTICO, linea,
@@ -154,7 +231,6 @@ class SemanticAnalyzer:
             self.symbol_table.registrar(lhs, "", None)
             return
         
-        # Inferir tipo del RHS
         if not rhs_tokens:
             self.error_handler.add_error(
                 ErrorType.SEMANTICO, linea,
@@ -164,7 +240,6 @@ class SemanticAnalyzer:
         
         rhs_tipo, rhs_valor = self._inferir_tipo_y_valor(rhs_tokens)
         
-        # Verificar compatibilidad
         if rhs_tipo is not None:
             lhs_tipo = self.symbol_table.obtener_tipo(lhs)
             if lhs_tipo:
@@ -172,13 +247,15 @@ class SemanticAnalyzer:
                     lhs_tipo, rhs_tipo, rhs_tokens, linea, lhs
                 )
                 
-                # Actualizar valor
                 if rhs_valor is not None:
-                    if lhs_tipo == "/dec" and rhs_tipo == "/ent":
+                    lhs_tipo_norm = CANONICAL_FROM_DECL.get(lhs_tipo, lhs_tipo)
+                    rhs_tipo_norm = CANONICAL_FROM_DECL.get(rhs_tipo, rhs_tipo)
+                    
+                    if lhs_tipo_norm == "/dec" and rhs_tipo_norm == "/ent":
                         self.symbol_table.actualizar_valor(lhs, float(rhs_valor))
-                    else:
+                    elif lhs_tipo_norm == rhs_tipo_norm:
                         self.symbol_table.actualizar_valor(lhs, rhs_valor)
-    
+
     def _check_undeclared_variables(self, parts: List[str], linea: int):
         """Verifica variables no declaradas en la línea"""
         for p in parts:
@@ -188,7 +265,7 @@ class SemanticAnalyzer:
                     "Variable indefinida", lexema=p
                 )
                 self.symbol_table.registrar(p, "", None)
-    
+
     def _extract_rhs(self, parts: List[str], start_pos: int) -> List[str]:
         """Extrae tokens del lado derecho de una asignación"""
         rhs_tokens = []
@@ -198,45 +275,42 @@ class SemanticAnalyzer:
             if tok.strip():
                 rhs_tokens.append(tok)
         return rhs_tokens
-    
+
     def _skip_to_delimiter(self, parts: List[str], start_pos: int) -> int:
         """Salta tokens hasta encontrar delimitador"""
         k = start_pos
         while k < len(parts) and parts[k] not in {",", ";"}:
             k += 1
         return k
-    
+
     def _inferir_tipo_y_valor(self, rhs_tokens: List[str]) -> Tuple[Optional[str], Optional[Any]]:
         """Infiere el tipo y valor de una expresión"""
         if not rhs_tokens:
             return None, None
         
-        # Caso simple: un solo token
         if len(rhs_tokens) == 1:
             t = rhs_tokens[0]
             if RE_ENTERO.match(t):
-                return "/ent", int(t)
+                return "\\ent", int(t)
             if RE_DECIMAL.match(t):
-                return "/dec", float(t)
+                return "\\dec", float(t)
             if RE_CADENA.match(t):
-                return "/cad", t[1:-1]
+                return "\\cad", t[1:-1]
             if RE_IDENTIFICADOR.match(t):
                 return self.symbol_table.obtener_tipo(t), None
             return None, None
         
-        # Expresión compleja: inferir por presencia
         has_cad = any(RE_CADENA.match(t) for t in rhs_tokens)
         has_dec = any(RE_DECIMAL.match(t) for t in rhs_tokens)
         has_ent = any(RE_ENTERO.match(t) for t in rhs_tokens)
         
         if has_cad:
-            return "/cad", None
+            return "\\cad", None
         if has_dec:
-            return "/dec", None
+            return "\\dec", None
         if has_ent:
-            return "/ent", None
+            return "\\ent", None
         
-        # Inferir de identificadores
         id_types = {
             self.symbol_table.obtener_tipo(t)
             for t in rhs_tokens
@@ -248,45 +322,28 @@ class SemanticAnalyzer:
             return next(iter(id_types)), None
         
         return None, None
-    
+
     def _check_type_compatibility(self, lhs_tipo: str, rhs_tipo: str,
-                                   rhs_tokens: List[str], linea: int, lhs_name: str = ""):
+                                    rhs_tokens: List[str], linea: int, lhs_name: str = ""):
         """Verifica compatibilidad de tipos"""
+        
+        lhs_tipo_norm = CANONICAL_FROM_DECL.get(lhs_tipo, lhs_tipo)
+        rhs_tipo_norm = CANONICAL_FROM_DECL.get(rhs_tipo, rhs_tipo)
+        
         compatible = (
-            (lhs_tipo == "/ent" and rhs_tipo == "/ent") or
-            (lhs_tipo == "/dec" and rhs_tipo in ("/ent", "/dec")) or
-            (lhs_tipo == "/cad" and rhs_tipo == "/cad")
+            (lhs_tipo_norm == "/ent" and rhs_tipo_norm == "/ent") or
+            (lhs_tipo_norm == "/dec" and rhs_tipo_norm in ("/ent", "/dec")) or
+            (lhs_tipo_norm == "/cad" and rhs_tipo_norm == "/cad")
         )
         
         if not compatible:
             tipo_fuente = CANONICAL_TO_SOURCE.get(lhs_tipo, lhs_tipo)
             
-            # Buscar lexema a mostrar
             show_lex = None
-            
-            if rhs_tipo == "/cad":
-                for t in rhs_tokens:
-                    if RE_CADENA.match(t):
-                        show_lex = t
-                        break
-                    
-            if show_lex is None and rhs_tipo == "/dec":
-                for t in rhs_tokens:
-                    if RE_DECIMAL.match(t):
-                        show_lex = t
-                        break
-                    
-            if show_lex is None and lhs_tipo == "/ent":
-                for t in rhs_tokens:
-                    if RE_DECIMAL.match(t):
-                        show_lex = t
-                        break
-                
-            if show_lex is None and lhs_tipo == "/cad":
-                for t in rhs_tokens:
-                    if not RE_CADENA.match(t):
-                        show_lex = t
-                        break
+            for t in rhs_tokens:
+                if RE_CADENA.match(t) or RE_DECIMAL.match(t) or RE_ENTERO.match(t) or RE_IDENTIFICADOR.match(t):
+                    show_lex = t
+                    break
             
             if show_lex is None and rhs_tokens:
                 show_lex = rhs_tokens[0]

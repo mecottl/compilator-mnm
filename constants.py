@@ -16,12 +16,32 @@ CANONICAL_FROM_DECL = {"\\ent": "/ent", "\\dec": "/dec", "\\cad": "/cad"}
 CANONICAL_TO_SOURCE = {"/ent": r"\ent", "/dec": r"\dec", "/cad": r"\cad"}
 
 # ===== PALABRAS CLAVE =====
-KEYWORDS = {"print", "for", "in", "range"}
+# 'in' y 'range' pueden quedarse, no hacen daño
+KEYWORDS = {"print", "for", "in", "range"} 
 
 # ===== PATRÓN DE TOKENIZACIÓN =====
+# <--- ¡MODIFICADO! ---
+# Hemos añadido '||', '&&', '==', '!=', '<=', '>=', y caracteres sueltos '<', '>', '!'
+# Es CRÍTICO que los operadores de 2 caracteres (ej: '||') vayan ANTES
+# que los de 1 caracter (ej: '|') en la expresión regular.
 TOKEN_PATTERN = re.compile(
-    r'("([^"\n]*)"|\'[^\'\n]*\')|([\\/][A-Za-z]+)|([A-Za-z_][A-Za-z0-9_]*)|(\d+\.\d+|\d+)|([=;,+\-/*()\[\]{}:])'
+    r'("([^"\n]*)"|\'[^\'\n]*\')|'  # 1. Cadenas
+    r'([\\/][A-Za-z]+)|'          # 2. Declaraciones (\ent, /ent)
+    r'([A-Za-z_][A-Za-z0-9_]*)|'  # 3. Identificadores y Palabras Clave (mnmVar, for)
+    r'(\d+\.\d+|\d+)|'            # 4. Números (10.5, 10)
+    
+    # 5. Operadores y Símbolos (¡NUEVO Y ORDENADO!)
+    r'(\|\||&&|==|!=|<=|>=|'     # Operadores multi-caracter
+    r'[=;,+\-/*()\[\]{}:<>]|'    # Operadores de un caracter
+    r'[!&|])'                    # Operadores lógicos de un caracter
 )
 
 # ===== SÍMBOLOS VÁLIDOS =====
-VALID_SYMBOLS = {"=", ";", "+", "-", "/", "*", "(", ")", ",", "[", "]", "{", "}", ":"}
+# <--- ¡MODIFICADO! ---
+# Añadimos todos los nuevos operadores para que _classify_token() los reconozca
+VALID_SYMBOLS = {
+    # Originales
+    "=", ";", "+", "-", "/", "*", "(", ")", ",", "[", "]", "{", "}", ":",
+    # Nuevos (Lógicos y Relacionales)
+    "||", "&&", "==", "!=", "<=", ">=", "<", ">", "!"
+}

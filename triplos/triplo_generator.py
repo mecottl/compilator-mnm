@@ -203,7 +203,6 @@ class TriploGenerator:
             else:
                 final_triplos_no_labels.append(triplo)
 
-        # --- INICIO CORRECCIÓN 3: Resolver JMP (arg1) y Saltos Cond (arg2) ---
         resolved_triplos = []
         for op, arg1, arg2 in final_triplos_no_labels:
             

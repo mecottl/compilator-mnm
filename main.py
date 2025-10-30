@@ -8,10 +8,7 @@ from gui.main_window import MainWindow
 def main():
     """Función principal para ejecutar la aplicación"""
     try:
-        # Crear ventana principal
         root = tk.Tk()
-        
-        # Crear aplicación
         app = MainWindow(root)
         
         # Ejecutar loop principal

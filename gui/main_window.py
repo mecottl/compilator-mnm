@@ -258,16 +258,12 @@ class MainWindow:
     
     def load_example(self):
         """Carga código de ejemplo"""
-        ejemplo = r"""\ent mnmI = 0;
-
-print("--- Inicio del bucle ---");
-
-for(mnmI = 1; mnmI <= 3; mnmI = mnmI + 1):{
-    print("Iteracion numero:");
-    print(mnmI);
-}
-
-print("--- Fin del bucle ---");"""
+        ejemplo = r"""\ent mnmoi = mnmNat * 3 + 7;
+\ent mnmecott = mnmNat / 2 - 5;
+ for(\ent mnmx = 1;  mnmx<0 ||mnmx>15; mnmx=mnmx+1):{
+    mnmoi = mnmoi + mnmNat * mnmi;
+    mnmecott = mnmecott - mnmi / 2;
+}"""
         
         self.editor_panel.set_code(ejemplo)
         self.status_text.set("Ejemplo cargado - Presiona 'Compilar' para probar")

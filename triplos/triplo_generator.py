@@ -48,57 +48,7 @@ class TriploGenerator:
         
         return self._resolve_labels()
 
-    # --- INICIO DE TU CÓDIGO ESPECIAL (SIN CAMBIOS) ---
-    def _generate_special_mnmoi_assignment(self, linea: int, parts: list[str]):
-        """Genera la asignación mnmoi = mnmoi + mnmNat * mnmi; forzando T1 y T2."""
-        
-        expr_tokens = parts[2:-1] 
-        var_name = parts[0]
-        
-        sub_expr_tokens = expr_tokens[2:]
-        self.temp_count = 1 
-        sub_triplos, final_sub_arg = self.translator.translate(
-            sub_expr_tokens, linea, self.temp_count
-        )
-        self.triplos.extend(sub_triplos)
-        
-        temp_count_next = self.temp_count + 1
-        next_temp_for_mnmoi = f"T{temp_count_next}" 
-        self._add_triplo("=", next_temp_for_mnmoi, expr_tokens[0])
-        
-        op = expr_tokens[1]
-        self._add_triplo(op, next_temp_for_mnmoi, final_sub_arg)
-        
-        self._add_triplo("=", var_name, next_temp_for_mnmoi)
-        
-        self.temp_count = 1
-
-    def _generate_special_mnmecott_assignment(self, linea: int, parts: list[str]):
-        """Genera la asignación mnmecott = mnmecott - mnmi / 2; forzando T1 y T2."""
-        
-        expr_tokens = parts[2:-1]
-        var_name = parts[0]
-        
-        sub_expr_tokens = expr_tokens[2:]
-        self.temp_count = 1 
-        sub_triplos, final_sub_arg = self.translator.translate(
-            sub_expr_tokens, linea, self.temp_count
-        )
-        self.triplos.extend(sub_triplos)
-        
-        temp_count_next = self.temp_count + 1
-        next_temp_for_mnmecott = f"T{temp_count_next}" 
-        self._add_triplo("=", next_temp_for_mnmecott, expr_tokens[0])
-        
-        op = expr_tokens[1]
-        self._add_triplo(op, next_temp_for_mnmecott, final_sub_arg)
-        
-        self._add_triplo("=", var_name, next_temp_for_mnmecott)
-        
-        self.temp_count = 1
-    # --- FIN DE TU CÓDIGO ESPECIAL ---
-
-
+    # --- INICIO DE LA MODIFICACIÓN ---
     def _generate_block(self, stop_at_line: int):
         """Ejecuta un bloque de código, línea por línea."""
         while self.line_cursor < len(self.lines_tokens) and self.line_cursor + 1 < stop_at_line:
@@ -108,19 +58,29 @@ class TriploGenerator:
             if not parts or parts == ["}"]:
                 continue
             
-            # --- MANEJO ESPECIAL DE ASIGNACIONES DENTRO DEL FOR ---
-            if parts[:6] == ['mnmoi', '=', 'mnmoi', '+', 'mnmNat', '*']: 
-                self._generate_special_mnmoi_assignment(linea, parts)
-                continue
-            
-            if parts[:6] == ['mnmecott', '=', 'mnmecott', '-', 'mnmi', '/']: 
-                self._generate_special_mnmecott_assignment(linea, parts)
-                continue
-            # --- FIN MANEJO ESPECIAL ---
-            
+            # Nueva lógica para manejar declaraciones
             if parts[0] in VALID_DECL_FORMS:
+                if "=" in parts:
+                    # Es una declaración CON asignación (ej: \ent mnmI = 0)
+                    # Debemos generar triplos para la parte de la asignación.
+                    try:
+                        # Encontrar el índice del nombre de la variable
+                        var_name_idx = 1
+                        if parts[var_name_idx] == ",": # Ignorar comas (sintaxis antigua)
+                            var_name_idx += 1
+                        
+                        # Crear una lista de tokens solo con la asignación
+                        # ej: de [\ent, mnmI, =, 0, ;] -> [mnmI, =, 0, ;]
+                        parts_de_asignacion = parts[var_name_idx:]
+                        self._generate_assignment(linea, parts_de_asignacion)
+                    except Exception:
+                        pass # El analizador semántico ya reportó este error
+                
+                # Si es una declaración sin asignación (ej: \ent mnmI;),
+                # simplemente la saltamos (no genera triplos).
                 continue
             
+            # Lógica normal para el resto de líneas
             if parts[0] == "for":
                 self._generate_for(linea, parts)
                 continue
@@ -130,8 +90,10 @@ class TriploGenerator:
                 continue
                 
             if "=" in parts:
+                 # Asignación normal (ej: mnmI = mnmI + 1)
                  self._generate_assignment(linea, parts)
                  continue
+    # --- FIN DE LA MODIFICACIÓN ---
 
     def _generate_assignment(self, linea: int, parts: list[str]):
         """Genera triplos para una asignación (ej: mnmVar = expr)"""
@@ -148,9 +110,7 @@ class TriploGenerator:
             )
             
             self.triplos.extend(expr_triplos)
-            
             self._add_triplo("=", var_name, final_arg)
-            
             self.temp_count = 1 
 
         except Exception as e:
@@ -210,9 +170,6 @@ class TriploGenerator:
 
         self._add_triplo("LABEL", label_cond_start, None)
         
-        # --- ¡INICIO DE LA MODIFICACIÓN! ---
-        
-        # CASO 1: Lógica de OR (||)
         if "||" in cond_tokens:
             or_pos = cond_tokens.index("||")
             cond1_tokens = cond_tokens[:or_pos]
@@ -226,8 +183,8 @@ class TriploGenerator:
             self.triplos.extend(cond1_triplos)
             self.temp_count = self.translator.temp_count
             
-            self._add_triplo("True", label_body_start, None)
-            self._add_triplo("False", label_cond2_start, None) 
+            self._add_triplo("JMP", "True", label_body_start)
+            self._add_triplo("JMP", "False", label_cond2_start) 
 
             self._add_triplo("LABEL", label_cond2_start, None)
             
@@ -237,10 +194,9 @@ class TriploGenerator:
             self.triplos.extend(cond2_triplos)
             self.temp_count = self.translator.temp_count
 
-            self._add_triplo("True", label_body_start, None)
-            self._add_triplo("False", label_loop_end, None)
+            self._add_triplo("JMP", "True", label_body_start)
+            self._add_triplo("JMP", "False", label_loop_end)
         
-        # CASO 2: Lógica de AND (&&)
         elif "&&" in cond_tokens:
             and_pos = cond_tokens.index("&&")
             cond1_tokens = cond_tokens[:and_pos]
@@ -248,20 +204,15 @@ class TriploGenerator:
             
             label_cond2_start = self._new_label() 
             
-            # --- CONDICIÓN 1 ---
             cond1_triplos, final_cond1_arg = self.translator.translate(
                 cond1_tokens, linea, self.temp_count
             )
             self.triplos.extend(cond1_triplos)
             self.temp_count = self.translator.temp_count
             
-            # Lógica de cortocircuito de AND:
-            # Si es FALSO, salta al final del bucle
-            self._add_triplo("False", label_loop_end, None)
-            # Si es VERDADERO, salta a la segunda condición
-            self._add_triplo("True", label_cond2_start, None)
+            self._add_triplo("JMP", "False", label_loop_end)
+            self._add_triplo("JMP", "True", label_cond2_start)
 
-            # --- ETIQUETA y CONDICIÓN 2 ---
             self._add_triplo("LABEL", label_cond2_start, None)
             
             cond2_triplos, final_cond2_arg = self.translator.translate(
@@ -270,12 +221,9 @@ class TriploGenerator:
             self.triplos.extend(cond2_triplos)
             self.temp_count = self.translator.temp_count
 
-            # Si la segunda es Verdadera (ambas lo son), salta al cuerpo
-            self._add_triplo("True", label_body_start, None)
-            # Si la segunda es Falsa, salta al final del bucle
-            self._add_triplo("False", label_loop_end, None)
+            self._add_triplo("JMP", "True", label_body_start)
+            self._add_triplo("JMP", "False", label_loop_end)
             
-        # CASO 3: Lógica simple
         else:
             cond_triplos, final_cond_arg = self.translator.translate(
                 cond_tokens, linea, self.temp_count
@@ -283,11 +231,9 @@ class TriploGenerator:
             self.triplos.extend(cond_triplos)
             self.temp_count = self.translator.temp_count
             
-            self._add_triplo("True", label_body_start, None)
-            self._add_triplo("False", label_loop_end, None)
+            self._add_triplo("JMP", "True", label_body_start)
+            self._add_triplo("JMP", "False", label_loop_end)
         
-        # --- ¡FIN DE LA MODIFICACIÓN! ---
-
         self._add_triplo("LABEL", label_body_start, None)
         
         start_line_idx = self.line_cursor
@@ -350,9 +296,13 @@ class TriploGenerator:
             resolved_arg1 = arg1
             resolved_arg2 = arg2
             
-            if op == "JMP" or op in ("True", "False"):
-                resolved_arg1 = label_map.get(arg1, arg1)
-                resolved_arg2 = ""
+            if op == "JMP":
+                if arg1 == "True" or arg1 == "False":
+                    resolved_arg1 = arg1
+                    resolved_arg2 = label_map.get(arg2, arg2)
+                else:
+                    resolved_arg1 = label_map.get(arg1, arg1)
+                    resolved_arg2 = ""
             
             resolved_triplos.append((op, resolved_arg1, resolved_arg2))
         

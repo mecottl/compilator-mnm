@@ -6,20 +6,21 @@ from semantic_analyzer import SemanticAnalyzer
 from error_handler import ErrorHandler
 from symbol_table import SymbolTable
 from interpreter import Interpreter
+# Importación absoluta (funciona desde main.py)
 from triplos.triplo_generator import TriploGenerator
 from utils.exporter import export_triplos_to_txt, export_triplos_to_csv
 
 class Compilador:
     """Compilador principal que coordina todos los componentes"""
     
-    def _init_(self):
+    def __init__(self):
         self.error_handler = ErrorHandler()
         self.symbol_table = SymbolTable()
         self.lexer = Lexer()
         self.semantic_analyzer = SemanticAnalyzer(self.error_handler, self.symbol_table)
         self.interpreter = Interpreter(self.symbol_table, self.error_handler)
         self.triplo_generator = TriploGenerator(self.symbol_table, self.error_handler)
-        # --- 1. AÑADIR EL CONTADOR DE COMPILACIÓN ---
+        # Contador para los archivos de triplos
         self.compilation_count = 1
 
     def analizar_codigo(self, codigo: str) -> Tuple[List[Error], List[Token], Dict[str, Any]]:
@@ -32,7 +33,8 @@ class Compilador:
         self.lexer.reset()
         
         # Fase 1: Análisis léxico
-        tokens, tokens_por_linea = self.tokenize(codigo)
+        # --- CORRECCIÓN 1 ---
+        tokens, tokens_por_linea = self.lexer.tokenize(codigo)
         
         # Fase 2: Análisis semántico
         self.semantic_analyzer.analyze(tokens_por_linea)
@@ -43,17 +45,20 @@ class Compilador:
         salida_ejecucion = []
         lista_de_triplos = []
         
+        # Fase de Ejecución (Solo si NO hay errores)
         if not self.error_handler.has_errors(): 
             try:
                 salida_ejecucion = self.interpreter.execute(tokens_por_linea)
             except Exception as e:
                 self.error_handler.add_error(ErrorType.SEMANTICO, 0, f"Error de ejecución: {e}", "runtime")
 
+        # Fase de Generación de Triplos (Se ejecuta SIEMPRE)
         try:
             self.triplo_generator = TriploGenerator(self.symbol_table, self.error_handler)
             lista_de_triplos = self.triplo_generator.generate(tokens_por_linea)
             
             if lista_de_triplos:
+                # Crear nombres de archivo dinámicos
                 txt_filename = f"triplos_{self.compilation_count}.txt"
                 csv_filename = f"triplos_{self.compilation_count}.csv"
                 
@@ -63,19 +68,36 @@ class Compilador:
         except Exception as e:
             self.error_handler.add_error(ErrorType.SEMANTICO, 0, f"Error de generación de triplos: {e}", "triplo")
         
+        # Incrementar el contador para la próxima compilación
         self.compilation_count += 1
         
         errores = self.error_handler.deduplicate_errors()
 
+        # Preparar información adicional
         info_adicional = {
-            "tabla_simbolos": self.get_tabla_final(),
+            # --- CORRECCIÓN 2 ---
+            "tabla_simbolos": self.symbol_table.get_tabla_final(),
             "salida_ejecucion": salida_ejecucion,
             "lista_triplos": lista_de_triplos
         }
         
         return errores, tokens, info_adicional
 
-_compilador_instancia = Compilador()
+
+# Instancia singleton del compilador
+_compilador_singleton = Compilador()
+
 
 def analizar_codigo(codigo: str) -> Tuple[List[Error], List[Token], Dict[str, Any]]:
-    return _compilador_instancia.analizar_codigo(codigo)
+    """Función de conveniencia para analizar código"""
+    return _compilador_singleton.analizar_codigo(codigo)
+
+
+def obtener_tabla_simbolos(info_adicional: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    """Extrae la tabla de símbolos de la información adicional"""
+    return info_adicional.get("tabla_simbolos", {})
+
+
+def obtener_salida_ejecucion(info_adicional: Dict[str, Any]) -> List[str]:
+    """Extrae la salida de ejecución de la información adicional"""
+    return info_adicional.get("salida_ejecucion", [])

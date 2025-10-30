@@ -50,11 +50,9 @@ class ExpressionTranslator:
             # 1. Manejar paréntesis (evaluación recursiva)
             if tokens[0] == "(":
                 # Lógica simplificada si toda la expresión está entre paréntesis
-                # (Una implementación completa requeriría un parser)
                 return self.translate(tokens[1:-1], linea, self.temp_count)
 
             # 2. Crear el temporal principal y cargar el primer operando.
-            # (ej: T1)
             current_temp = self._new_temp()
             
             # (ej: =, T1, mnmNat)
@@ -67,8 +65,6 @@ class ExpressionTranslator:
                 arg2 = tokens[pos + 1]
                 
                 # Aplicar la operación al temporal actual
-                # ej: (*, T1, 3)
-                # ej: (+, T1, 7)
                 self._add_triplo(op, current_temp, arg2)
                 
                 pos += 2 # Saltar el operador y el operando

@@ -48,55 +48,6 @@ class TriploGenerator:
         
         return self._resolve_labels()
 
-    def _generate_special_mnmoi_assignment(self, linea: int, parts: list[str]):
-        """Genera la asignación mnmoi = mnmoi + mnmNat * mnmi; forzando T1 y T2."""
-        
-        expr_tokens = parts[2:-1] 
-        var_name = parts[0]
-        
-        sub_expr_tokens = expr_tokens[2:]
-        self.temp_count = 1 
-        sub_triplos, final_sub_arg = self.translator.translate(
-            sub_expr_tokens, linea, self.temp_count
-        )
-        self.triplos.extend(sub_triplos)
-        
-        temp_count_next = self.temp_count + 1
-        next_temp_for_mnmoi = f"T{temp_count_next}" 
-        self._add_triplo("=", next_temp_for_mnmoi, expr_tokens[0])
-        
-        op = expr_tokens[1]
-        self._add_triplo(op, next_temp_for_mnmoi, final_sub_arg)
-        
-        self._add_triplo("=", var_name, next_temp_for_mnmoi)
-        
-        self.temp_count = 1
-
-    def _generate_special_mnmecott_assignment(self, linea: int, parts: list[str]):
-        """Genera la asignación mnmecott = mnmecott - mnmi / 2; forzando T1 y T2."""
-        
-        expr_tokens = parts[2:-1]
-        var_name = parts[0]
-        
-        sub_expr_tokens = expr_tokens[2:]
-        self.temp_count = 1 
-        sub_triplos, final_sub_arg = self.translator.translate(
-            sub_expr_tokens, linea, self.temp_count
-        )
-        self.triplos.extend(sub_triplos)
-        
-        temp_count_next = self.temp_count + 1
-        next_temp_for_mnmecott = f"T{temp_count_next}" 
-        self._add_triplo("=", next_temp_for_mnmecott, expr_tokens[0])
-        
-        op = expr_tokens[1]
-        self._add_triplo(op, next_temp_for_mnmecott, final_sub_arg)
-        
-        self._add_triplo("=", var_name, next_temp_for_mnmecott)
-        
-        self.temp_count = 1
-
-
     def _generate_block(self, stop_at_line: int):
         """Ejecuta un bloque de código, línea por línea."""
         while self.line_cursor < len(self.lines_tokens) and self.line_cursor + 1 < stop_at_line:
@@ -106,34 +57,19 @@ class TriploGenerator:
             if not parts or parts == ["}"]:
                 continue
             
-            # --- MANEJO ESPECIAL DE ASIGNACIONES DENTRO DEL FOR ---
-            if parts[:6] == ['mnmoi', '=', 'mnmoi', '+', 'mnmNat', '*']: 
-                self._generate_special_mnmoi_assignment(linea, parts)
+            if parts[0] in VALID_DECL_FORMS:
                 continue
-            
-            if parts[:6] == ['mnmecott', '=', 'mnmecott', '-', 'mnmi', '/']: 
-                self._generate_special_mnmecott_assignment(linea, parts)
-                continue
-            # --- FIN MANEJO ESPECIAL ---
             
             if parts[0] == "for":
                 self._generate_for(linea, parts)
                 continue
-                
-            if "=" in parts and parts[0] not in VALID_DECL_FORMS:
-                 self._generate_assignment(linea, parts)
-                 continue
             
-            if parts[0] in VALID_DECL_FORMS and "=" in parts:
-                 try:
-                     var_name_idx = 1
-                     if parts[var_name_idx] == ",":
-                         var_name_idx += 1
-                    
-                     parts_de_asignacion = parts[var_name_idx:]
-                     self._generate_assignment(linea, parts_de_asignacion)
-                 except Exception:
-                     pass
+            if parts[0] == "print":
+                self._generate_print(linea, parts)
+                continue
+                
+            if "=" in parts:
+                 self._generate_assignment(linea, parts)
                  continue
 
     def _generate_assignment(self, linea: int, parts: list[str]):
@@ -151,13 +87,37 @@ class TriploGenerator:
             )
             
             self.triplos.extend(expr_triplos)
-            
             self._add_triplo("=", var_name, final_arg)
-            
             self.temp_count = 1 
 
         except Exception as e:
             self.error_handler.add_error("SEMANTICO", linea, f"Error en asignación de triplo: {e}", " ".join(parts))
+
+    def _generate_print(self, linea: int, parts: list[str]):
+        """
+        Genera triplos para la *expresión* dentro de un 'print',
+        sin generar un triplo 'PRINT'.
+        """
+        try:
+            if not (len(parts) >= 3 and parts[1] == "("):
+                return
+
+            expr_tokens = parts[2:]
+            if expr_tokens and expr_tokens[-1] == ";":
+                expr_tokens.pop()
+            if expr_tokens and expr_tokens[-1] == ")":
+                expr_tokens.pop()
+
+            if not expr_tokens:
+                return
+
+            expr_triplos, final_arg = self.translator.translate(
+                expr_tokens, linea, self.temp_count
+            )
+            self.triplos.extend(expr_triplos)
+            self.temp_count = self.translator.temp_count
+        except Exception as e:
+            pass
 
     def _generate_for(self, linea: int, parts: list[str]):
         """Genera triplos para un 'for', incluyendo saltos."""
@@ -179,17 +139,14 @@ class TriploGenerator:
         label_incr_start = self._new_label()
         label_loop_end = self._new_label()
 
-        # 3. Generar triplos para la INICIALIZACIÓN (init)
         if init_tokens:
             if init_tokens[0] in VALID_DECL_FORMS:
                 self._generate_assignment(linea, init_tokens[1:])
             else:
                 self._generate_assignment(linea, init_tokens)
 
-        # 4. Generar triplos para la CONDICIÓN (cond)
         self._add_triplo("LABEL", label_cond_start, None)
         
-        # --- Lógica de OR (||) para Cortocircuito ---
         if "||" in cond_tokens:
             or_pos = cond_tokens.index("||")
             cond1_tokens = cond_tokens[:or_pos]
@@ -197,44 +154,41 @@ class TriploGenerator:
             
             label_cond2_start = self._new_label() 
             
-            # --- CONDICIÓN 1 (mnmx < 0) ---
             cond1_triplos, final_cond1_arg = self.translator.translate(
                 cond1_tokens, linea, self.temp_count
             )
             self.triplos.extend(cond1_triplos)
-            self.temp_count = self.translator.temp_count # Es 1
+            self.temp_count = self.translator.temp_count
             
-            self._add_triplo("True", final_cond1_arg, label_body_start)
-            self._add_triplo("False", final_cond1_arg, label_cond2_start) 
+            # --- INICIO DE LA MODIFICACIÓN 1 ---
+            # Se mueve la etiqueta a Arg1 y se borra Arg2
+            self._add_triplo("True", label_body_start, None)
+            self._add_triplo("False", label_cond2_start, None) 
 
-            # --- ETIQUETA y CONDICIÓN 2 (mnmx > 15) ---
             self._add_triplo("LABEL", label_cond2_start, None)
             
             cond2_triplos, final_cond2_arg = self.translator.translate(
                 cond2_tokens, linea, self.temp_count
             )
             self.triplos.extend(cond2_triplos)
-            self.temp_count = self.translator.temp_count # Es 1
+            self.temp_count = self.translator.temp_count
 
-            self._add_triplo("True", final_cond2_arg, label_body_start)
-            self._add_triplo("False", final_cond2_arg, label_loop_end)
+            self._add_triplo("True", label_body_start, None)
+            self._add_triplo("False", label_loop_end, None)
+            # --- FIN DE LA MODIFICACIÓN 1 ---
             
         else:
-            # Lógica original para condiciones simples
             cond_triplos, final_cond_arg = self.translator.translate(
                 cond_tokens, linea, self.temp_count
             )
             self.triplos.extend(cond_triplos)
             self.temp_count = self.translator.temp_count
             
-            self._add_triplo("True", final_cond_arg, label_body_start)
-            
-            # --- ¡¡AQUÍ ESTABA EL ERROR!! ---
-            # Se corrigió _add_add_triplo por _add_triplo
-            self._add_triplo("False", final_cond_arg, label_loop_end)
+            # --- INICIO DE LA MODIFICACIÓN 1 (ELSE) ---
+            self._add_triplo("True", label_body_start, None)
+            self._add_triplo("False", label_loop_end, None)
+            # --- FIN DE LA MODIFICACIÓN 1 (ELSE) ---
 
-
-        # 5. Generar triplos para el CUERPO (body)
         self._add_triplo("LABEL", label_body_start, None)
         
         start_line_idx = self.line_cursor
@@ -246,16 +200,13 @@ class TriploGenerator:
 
         self._generate_block(stop_at_line=end_brace_line_idx)
         
-        # 6. Generar triplos para el INCREMENTO (incr)
         self._add_triplo("LABEL", label_incr_start, None)
         if incr_tokens:
             self._generate_assignment(linea, incr_tokens)
 
-        # 7. Generar Salto Incondicional
         self._add_triplo("JMP", label_cond_start, None)
 
-        # 8. Marcar el final del bucle
-        self._add_triplo("LABEL", label_loop_end, None)
+        self._add_triplo("LABEL_END_LOOP", label_loop_end, None)
         
         self.line_cursor = end_brace_line_idx
 
@@ -274,31 +225,55 @@ class TriploGenerator:
             cursor += 1
         return -1
 
+    # --- INICIO DE LA MODIFICACIÓN 2 ---
+    # Reemplaza tu función _resolve_labels() por esta
     def _resolve_labels(self) -> list:
         """
-        Pasa final. Reemplaza todas las etiquetas (L1, L2) por sus
-        números de línea reales (índice + 1).
+        Pasa final. Reemplaza etiquetas (L1) por números de línea (19)
+        y añade '...' solo si un bucle termina al final del código.
         """
         label_map = {}
-        
+        end_loop_labels = set()
         final_triplos_no_labels = []
-        for triplo in self.triplos:
-            if triplo[0] == "LABEL":
-                label_map[triplo[1]] = len(final_triplos_no_labels) + 1
+        
+        # --- Pase 1: Mapear posiciones de etiquetas y filtrar ---
+        current_index = 1
+        for op, arg1, arg2 in self.triplos:
+            if op == "LABEL":
+                label_map[arg1] = current_index
+            elif op == "LABEL_END_LOOP":
+                label_map[arg1] = current_index
+                end_loop_labels.add(arg1)
             else:
-                final_triplos_no_labels.append(triplo)
+                final_triplos_no_labels.append((op, arg1, arg2))
+                current_index += 1
 
+        # --- Pase 2: Resolver saltos ---
         resolved_triplos = []
         for op, arg1, arg2 in final_triplos_no_labels:
             
             resolved_arg1 = arg1
             resolved_arg2 = arg2
             
-            if op == "JMP":
+            # 'JMP', 'True', y 'False' ahora todos usan Arg1 para el salto
+            if op == "JMP" or op in ("True", "False"):
                 resolved_arg1 = label_map.get(arg1, arg1)
-            elif op in ("True", "False"):
-                resolved_arg2 = label_map.get(arg2, arg2)
+                resolved_arg2 = "" # Forzar Arg2 a estar vacío
             
             resolved_triplos.append((op, resolved_arg1, resolved_arg2))
+        
+        # --- Pase 3: Añadir '...' si es necesario ---
+        end_of_code_line = len(resolved_triplos) + 1
+        
+        add_ellipsis = False
+        for label_name in end_loop_labels:
+            if label_map.get(label_name) == end_of_code_line:
+                add_ellipsis = True
+                break
+                
+        if add_ellipsis:
+            # Añadir '...' con campos vacíos
+            resolved_triplos.append(("...", "", ""))
                 
         return resolved_triplos
+    # --- FIN DE LA MODIFICACIÓN 2 ---

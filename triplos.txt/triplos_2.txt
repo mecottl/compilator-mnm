@@ -1,0 +1,16 @@
+#     Operador   Arg1            Arg2           
+-----------------------------------------------
+1     =          T1              "--- Inicio del bucle ---"
+2     =          T1              1              
+3     =          mnmI            T1             
+4     =          T1              mnmI           
+5     <=         T1              3              
+6     True       8                              
+7     False      14                             
+8     =          T1              "Iteracion numero:"
+9     =          T1              mnmI           
+10    =          T1              mnmI           
+11    +          T1              1              
+12    =          mnmI            T1             
+13    JMP        4                              
+14    =          T1              "--- Fin del bucle ---"

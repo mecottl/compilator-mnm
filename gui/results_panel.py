@@ -143,19 +143,19 @@ class ResultsPanel:
         triplos_frame.columnconfigure(0, weight=1)
         
         # Etiqueta
-        triplos_label = ttk.Label(triplos_frame, text="Lista de triplos (índice, operador, arg1, arg2):",
+        triplos_label = ttk.Label(triplos_frame, text="Lista de triplos (índice, operador, DO, DF):",
                                  style='Title.TLabel')
         triplos_label.grid(row=0, column=0, sticky="w", padx=4, pady=4)
         
         # Tabla de triplos
-        columns = ('#', 'Operador', 'Arg1', 'Arg2')
+        columns = ('#', 'Operador', 'DO', 'DF')
         self.triple_tree = ttk.Treeview(triplos_frame, columns=columns,
                                         show='headings', style='Custom.Treeview')
         
         for col, w, anchor in (('#', 60, 'center'),
                                ('Operador', 120, 'center'),
-                               ('Arg1', 120, 'center'),
-                               ('Arg2', 120, 'center')):
+                               ('DO', 120, 'center'),
+                               ('DF', 120, 'center')):
             self.triple_tree.heading(col, text=col)
             self.triple_tree.column(col, width=w, anchor=anchor)
         
@@ -189,8 +189,8 @@ class ResultsPanel:
             self.triple_tree.insert('', 'end', values=(
                 idx,           # Columna '#'
                 op,            # Columna 'Operador'
-                arg1,          # Columna 'Arg1'
-                arg2_display   # Columna 'Arg2'
+                arg1,          # Columna 'DO'
+                arg2_display   # Columna 'DF'
             ))
 
     def show_errors(self, errores: List[Error]):

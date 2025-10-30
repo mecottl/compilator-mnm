@@ -1,4 +1,5 @@
 # compiler.py - Clase principal del compilador
+import os # <-- 1. IMPORTAR OS
 from typing import List, Tuple, Dict, Any
 from models import Token, Error, ErrorType
 from lexer import Lexer
@@ -6,9 +7,11 @@ from semantic_analyzer import SemanticAnalyzer
 from error_handler import ErrorHandler
 from symbol_table import SymbolTable
 from interpreter import Interpreter
-# Importación absoluta (funciona desde main.py)
 from triplos.triplo_generator import TriploGenerator
 from utils.exporter import export_triplos_to_txt, export_triplos_to_csv
+
+# --- 2. DEFINIR EL NOMBRE DE LA CARPETA DE SALIDA ---
+TRIPLOS_OUTPUT_FOLDER = "triplos.txt"
 
 class Compilador:
     """Compilador principal que coordina todos los componentes"""
@@ -20,8 +23,13 @@ class Compilador:
         self.semantic_analyzer = SemanticAnalyzer(self.error_handler, self.symbol_table)
         self.interpreter = Interpreter(self.symbol_table, self.error_handler)
         self.triplo_generator = TriploGenerator(self.symbol_table, self.error_handler)
-        # Contador para los archivos de triplos
         self.compilation_count = 1
+        
+        # --- 3. CREAR LA CARPETA DE SALIDA SI NO EXISTE ---
+        try:
+            os.makedirs(TRIPLOS_OUTPUT_FOLDER, exist_ok=True)
+        except Exception as e:
+            print(f"Advertencia: No se pudo crear la carpeta de salida '{TRIPLOS_OUTPUT_FOLDER}': {e}")
 
     def analizar_codigo(self, codigo: str) -> Tuple[List[Error], List[Token], Dict[str, Any]]:
         """
@@ -33,7 +41,6 @@ class Compilador:
         self.lexer.reset()
         
         # Fase 1: Análisis léxico
-        # --- CORRECCIÓN 1 ---
         tokens, tokens_por_linea = self.lexer.tokenize(codigo)
         
         # Fase 2: Análisis semántico
@@ -57,25 +64,28 @@ class Compilador:
             self.triplo_generator = TriploGenerator(self.symbol_table, self.error_handler)
             lista_de_triplos = self.triplo_generator.generate(tokens_por_linea)
             
+            # --- 4. MODIFICAR LA RUTA DE EXPORTACIÓN ---
             if lista_de_triplos:
-                # Crear nombres de archivo dinámicos
-                txt_filename = f"triplos_{self.compilation_count}.txt"
-                csv_filename = f"triplos_{self.compilation_count}.csv"
+                # Crear nombres de archivo base
+                txt_filename_base = f"triplos_{self.compilation_count}.txt"
+                csv_filename_base = f"triplos_{self.compilation_count}.csv"
                 
-                export_triplos_to_txt(lista_de_triplos, txt_filename)
-                export_triplos_to_csv(lista_de_triplos, csv_filename)
+                # Unir la carpeta con el nombre de archivo
+                txt_filepath = os.path.join(TRIPLOS_OUTPUT_FOLDER, txt_filename_base)
+                csv_filepath = os.path.join(TRIPLOS_OUTPUT_FOLDER, csv_filename_base)
+                
+                export_triplos_to_txt(lista_de_triplos, txt_filepath)
+                export_triplos_to_csv(lista_de_triplos, csv_filepath)
 
         except Exception as e:
             self.error_handler.add_error(ErrorType.SEMANTICO, 0, f"Error de generación de triplos: {e}", "triplo")
         
-        # Incrementar el contador para la próxima compilación
         self.compilation_count += 1
         
         errores = self.error_handler.deduplicate_errors()
 
         # Preparar información adicional
         info_adicional = {
-            # --- CORRECCIÓN 2 ---
             "tabla_simbolos": self.symbol_table.get_tabla_final(),
             "salida_ejecucion": salida_ejecucion,
             "lista_triplos": lista_de_triplos

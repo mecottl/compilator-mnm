@@ -9,7 +9,7 @@ def export_triplos_to_txt(triplos: List[Tuple], filename: str):
     try:
         with open(filename, 'w', encoding='utf-8') as f:
             # Escribir la cabecera
-            f.write(f"{'#':<5} {'Operador':<10} {'Arg1':<15} {'Arg2':<15}\n")
+            f.write(f"{'#':<5} {'Operador':<10} {'DO':<15} {'DF':<15}\n")
             f.write("-" * 47 + "\n")
             for idx, (op, arg1, arg2) in enumerate(triplos, 1):
                 arg1_str = arg1 if arg1 is not None else ""
@@ -27,7 +27,7 @@ def export_triplos_to_csv(triplos: List[Tuple], filename: str):
             writer = csv.writer(f)
             
             # Escribir la cabecera
-            writer.writerow(['#', 'Operador', 'Arg1', 'Arg2'])
+            writer.writerow(['#', 'Operador', 'DO', 'DF'])
             
             # Escribir cada triplo
             for idx, (op, arg1, arg2) in enumerate(triplos, 1):

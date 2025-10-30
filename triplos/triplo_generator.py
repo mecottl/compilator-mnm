@@ -51,62 +51,50 @@ class TriploGenerator:
     def _generate_special_mnmoi_assignment(self, linea: int, parts: list[str]):
         """Genera la asignación mnmoi = mnmoi + mnmNat * mnmi; forzando T1 y T2."""
         
-        # Partes relevantes: [mnmoi, +, mnmNat, *, mnmi, ;]
-        expr_tokens = parts[2:-1] # [mnmoi, +, mnmNat, *, mnmi]
-        var_name = parts[0] # mnmoi
+        expr_tokens = parts[2:-1] 
+        var_name = parts[0]
         
-        # 1. Traducir la sub-expresión (mnmNat * mnmi) en T1 (Acumulador)
-        sub_expr_tokens = expr_tokens[2:] # [mnmNat, *, mnmi]
-        # Reiniciar a T1 antes de traducir la sub-expresión
+        sub_expr_tokens = expr_tokens[2:]
         self.temp_count = 1 
         sub_triplos, final_sub_arg = self.translator.translate(
             sub_expr_tokens, linea, self.temp_count
         )
-        self.triplos.extend(sub_triplos) # Triplos 19-21 (mnmNat * mnmi)
+        self.triplos.extend(sub_triplos)
         
-        # 2. Asignar mnmoi a un nuevo temporal T2.
-        temp_count_next = self.temp_count + 1 # T2
+        temp_count_next = self.temp_count + 1
         next_temp_for_mnmoi = f"T{temp_count_next}" 
-        self._add_triplo("=", next_temp_for_mnmoi, expr_tokens[0]) # (=, T2, mnmoi)
+        self._add_triplo("=", next_temp_for_mnmoi, expr_tokens[0])
         
-        # 3. Sumar T2 + T1, almacenar en T2
-        op = expr_tokens[1] # +
-        self._add_triplo(op, next_temp_for_mnmoi, final_sub_arg) # (+, T2, T1)
+        op = expr_tokens[1]
+        self._add_triplo(op, next_temp_for_mnmoi, final_sub_arg)
         
-        # 4. Asignar T2 al resultado final
-        self._add_triplo("=", var_name, next_temp_for_mnmoi) # (=, mnmoi, T2)
+        self._add_triplo("=", var_name, next_temp_for_mnmoi)
         
-        self.temp_count = 1 # Restaurar contador
+        self.temp_count = 1
 
     def _generate_special_mnmecott_assignment(self, linea: int, parts: list[str]):
         """Genera la asignación mnmecott = mnmecott - mnmi / 2; forzando T1 y T2."""
         
-        # Partes relevantes: [mnmecott, -, mnmi, /, 2, ;]
-        expr_tokens = parts[2:-1] # [mnmecott, -, mnmi, /, 2]
-        var_name = parts[0] # mnmecott
+        expr_tokens = parts[2:-1]
+        var_name = parts[0]
         
-        # 1. Traducir la sub-expresión (mnmi / 2) en T1 (Acumulador)
-        sub_expr_tokens = expr_tokens[2:] # [mnmi, /, 2]
-        # Reiniciar a T1 antes de traducir la sub-expresión
+        sub_expr_tokens = expr_tokens[2:]
         self.temp_count = 1 
         sub_triplos, final_sub_arg = self.translator.translate(
             sub_expr_tokens, linea, self.temp_count
         )
-        self.triplos.extend(sub_triplos) # Triplos 25-27 (mnmi / 2)
+        self.triplos.extend(sub_triplos)
         
-        # 2. Asignar mnmecott a un nuevo temporal T2.
-        temp_count_next = self.temp_count + 1 # T2
+        temp_count_next = self.temp_count + 1
         next_temp_for_mnmecott = f"T{temp_count_next}" 
-        self._add_triplo("=", next_temp_for_mnmecott, expr_tokens[0]) # (=, T2, mnmecott)
+        self._add_triplo("=", next_temp_for_mnmecott, expr_tokens[0])
         
-        # 3. Restar T2 - T1, almacenar en T2
-        op = expr_tokens[1] # -
-        self._add_triplo(op, next_temp_for_mnmecott, final_sub_arg) # (-, T2, T1)
+        op = expr_tokens[1]
+        self._add_triplo(op, next_temp_for_mnmecott, final_sub_arg)
         
-        # 4. Asignar T2 al resultado final
-        self._add_triplo("=", var_name, next_temp_for_mnmecott) # (=, mnmecott, T2)
+        self._add_triplo("=", var_name, next_temp_for_mnmecott)
         
-        self.temp_count = 1 # Restaurar contador
+        self.temp_count = 1
 
 
     def _generate_block(self, stop_at_line: int):
@@ -119,12 +107,10 @@ class TriploGenerator:
                 continue
             
             # --- MANEJO ESPECIAL DE ASIGNACIONES DENTRO DEL FOR ---
-            # Identificar la línea: mnmoi = mnmoi + mnmNat * mnmi;
             if parts[:6] == ['mnmoi', '=', 'mnmoi', '+', 'mnmNat', '*']: 
                 self._generate_special_mnmoi_assignment(linea, parts)
                 continue
             
-            # Identificar la línea: mnmecott = mnmecott - mnmi / 2;
             if parts[:6] == ['mnmecott', '=', 'mnmecott', '-', 'mnmi', '/']: 
                 self._generate_special_mnmecott_assignment(linea, parts)
                 continue
@@ -140,12 +126,12 @@ class TriploGenerator:
             
             if parts[0] in VALID_DECL_FORMS and "=" in parts:
                  try:
-                    var_name_idx = 1
-                    if parts[var_name_idx] == ",":
-                        var_name_idx += 1
+                     var_name_idx = 1
+                     if parts[var_name_idx] == ",":
+                         var_name_idx += 1
                     
-                    parts_de_asignacion = parts[var_name_idx:]
-                    self._generate_assignment(linea, parts_de_asignacion)
+                     parts_de_asignacion = parts[var_name_idx:]
+                     self._generate_assignment(linea, parts_de_asignacion)
                  except Exception:
                      pass
                  continue
@@ -160,7 +146,6 @@ class TriploGenerator:
             if expr_tokens and expr_tokens[-1] == ";":
                 expr_tokens.pop()
             
-            # Lógica para asignaciones normales (usa T1 como acumulador)
             expr_triplos, final_arg = self.translator.translate(
                 expr_tokens, linea, self.temp_count
             )
@@ -169,7 +154,6 @@ class TriploGenerator:
             
             self._add_triplo("=", var_name, final_arg)
             
-            # El traductor L-R no avanza el contador, por eso lo restauramos a 1.
             self.temp_count = 1 
 
         except Exception as e:
@@ -211,7 +195,6 @@ class TriploGenerator:
             cond1_tokens = cond_tokens[:or_pos]
             cond2_tokens = cond_tokens[or_pos + 1:]
             
-            # Etiqueta de la segunda condición (si la primera es False)
             label_cond2_start = self._new_label() 
             
             # --- CONDICIÓN 1 (mnmx < 0) ---
@@ -221,9 +204,7 @@ class TriploGenerator:
             self.triplos.extend(cond1_triplos)
             self.temp_count = self.translator.temp_count # Es 1
             
-            # Si la primera es True, saltar al cuerpo (cortocircuito)
             self._add_triplo("True", final_cond1_arg, label_body_start)
-            # Si la primera es False, saltar a la segunda condición
             self._add_triplo("False", final_cond1_arg, label_cond2_start) 
 
             # --- ETIQUETA y CONDICIÓN 2 (mnmx > 15) ---
@@ -235,9 +216,7 @@ class TriploGenerator:
             self.triplos.extend(cond2_triplos)
             self.temp_count = self.translator.temp_count # Es 1
 
-            # Si la segunda es True, saltar al cuerpo
             self._add_triplo("True", final_cond2_arg, label_body_start)
-            # Si la segunda es False, saltar al final del bucle
             self._add_triplo("False", final_cond2_arg, label_loop_end)
             
         else:
@@ -249,7 +228,10 @@ class TriploGenerator:
             self.temp_count = self.translator.temp_count
             
             self._add_triplo("True", final_cond_arg, label_body_start)
-            self._add_add_triplo("False", final_cond_arg, label_loop_end)
+            
+            # --- ¡¡AQUÍ ESTABA EL ERROR!! ---
+            # Se corrigió _add_add_triplo por _add_triplo
+            self._add_triplo("False", final_cond_arg, label_loop_end)
 
 
         # 5. Generar triplos para el CUERPO (body)
@@ -313,10 +295,8 @@ class TriploGenerator:
             resolved_arg2 = arg2
             
             if op == "JMP":
-                # JMP usa arg1 para la etiqueta
                 resolved_arg1 = label_map.get(arg1, arg1)
             elif op in ("True", "False"):
-                # Saltos condicionales usan arg2 para la etiqueta
                 resolved_arg2 = label_map.get(arg2, arg2)
             
             resolved_triplos.append((op, resolved_arg1, resolved_arg2))

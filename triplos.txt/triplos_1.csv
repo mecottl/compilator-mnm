@@ -4,12 +4,16 @@
 3,=,mnmI,T1
 4,=,T1,mnmI
 5,<=,T1,3
-6,True,8,
-7,False,14,
-8,=,T1,"""Iteracion numero:"""
-9,=,T1,mnmI
-10,=,T1,mnmI
-11,+,T1,1
-12,=,mnmI,T1
-13,JMP,4,
-14,=,T1,"""--- Fin del bucle ---"""
+6,False,18,
+7,True,8,
+8,=,T1,mnmI
+9,>,T1,10
+10,True,12,
+11,False,18,
+12,=,T1,"""Iteracion numero:"""
+13,=,T1,mnmI
+14,=,T1,mnmI
+15,+,T1,1
+16,=,mnmI,T1
+17,JMP,4,
+18,=,T1,"""--- Fin del bucle ---"""

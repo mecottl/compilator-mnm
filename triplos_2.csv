@@ -22,8 +22,7 @@
 21,=,T2,mnmoi
 22,+,T2,T1
 23,=,mnmoi,T2
-24,=,T1,mnmi
-25,/,T1,2
-26,=,T2,mnmecott
-27,-,T2,T1
-28,=,mnmecott,T2
+24,=,T1,mnmecott
+25,-,T1,mnmi
+26,/,T1,2
+27,=,mnmecott,T1

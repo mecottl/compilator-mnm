@@ -12,7 +12,7 @@ from utils.exporter import export_triplos_to_txt, export_triplos_to_csv
 class Compilador:
     """Compilador principal que coordina todos los componentes"""
     
-    def __init__(self):
+    def _init_(self):
         self.error_handler = ErrorHandler()
         self.symbol_table = SymbolTable()
         self.lexer = Lexer()
@@ -75,4 +75,7 @@ class Compilador:
         
         return errores, tokens, info_adicional
 
-# ... (El resto del archivo no necesita cambios) ...
+_compilador_instancia = Compilador()
+
+def analizar_codigo(codigo: str) -> Tuple[List[Error], List[Token], Dict[str, Any]]:
+    return _compilador_instancia.analizar_codigo(codigo)

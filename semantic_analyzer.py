@@ -76,7 +76,6 @@ class SemanticAnalyzer:
                 line_index += 1
                 continue
 
-            # 6. Es una línea '}' suelta?
             if parts == ["}"]:
                 self.error_handler.add_error(
                     ErrorType.SINTACTICO, linea_actual,
@@ -85,13 +84,11 @@ class SemanticAnalyzer:
                 line_index += 1
                 continue
 
-            # 7. Si no es nada de lo anterior, checar variables
             self._check_undeclared_variables(parts, linea_actual)
             
             line_index += 1
 
     def _find_matching_brace(self, tokens_por_linea: List[List[str]], start_line_idx: int) -> int:
-        """Encuentra el '}' que cierra un bloque."""
         nesting_level = 1
         cursor = start_line_idx
         
@@ -108,14 +105,12 @@ class SemanticAnalyzer:
                     
             cursor += 1
         
-        return -1 # No se encontró
+        return -1 
 
     def _is_for_loop(self, parts: List[str]) -> bool:
-        """Verifica si la línea es una cabecera de 'for'"""
         return parts and parts[0] == "for"
 
     def _process_basic_tokens(self, parts: List[str], linea: int):
-        """Procesa tokens básicos y los registra en la tabla"""
         for p in parts:
             if RE_ENTERO.match(p):
                 self.symbol_table.registrar(p, "\\ent", int(p))
@@ -129,17 +124,14 @@ class SemanticAnalyzer:
 
 
     def _is_declaration(self, parts: List[str]) -> bool:
-        """Verifica si la línea es una declaración"""
         return len(parts) > 0 and parts[0] in VALID_DECL_FORMS
 
     def _is_invalid_declaration(self, parts: List[str]) -> bool:
-        """Verifica si la línea usa declaración inválida"""
         if len(parts) > 0 and parts[0] in INVALID_DECL_FORMS:
             return True
         return False
 
     def _analyze_declaration(self, parts: List[str], linea: int):
-        """Analiza una declaración de variable"""
         first = parts[0]
         tipo_decl = CANONICAL_FROM_DECL[first]
         

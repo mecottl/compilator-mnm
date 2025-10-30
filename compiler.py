@@ -6,8 +6,8 @@ from semantic_analyzer import SemanticAnalyzer
 from error_handler import ErrorHandler
 from symbol_table import SymbolTable
 from interpreter import Interpreter
-# Hacemos la importación absoluta (funciona desde main.py)
 from triplos.triplo_generator import TriploGenerator
+from utils.exporter import export_triplos_to_txt, export_triplos_to_csv
 
 class Compilador:
     """Compilador principal que coordina todos los componentes"""
@@ -19,6 +19,8 @@ class Compilador:
         self.semantic_analyzer = SemanticAnalyzer(self.error_handler, self.symbol_table)
         self.interpreter = Interpreter(self.symbol_table, self.error_handler)
         self.triplo_generator = TriploGenerator(self.symbol_table, self.error_handler)
+        # --- 1. AÑADIR EL CONTADOR DE COMPILACIÓN ---
+        self.compilation_count = 1
 
     def analizar_codigo(self, codigo: str) -> Tuple[List[Error], List[Token], Dict[str, Any]]:
         """
@@ -30,67 +32,47 @@ class Compilador:
         self.lexer.reset()
         
         # Fase 1: Análisis léxico
-        tokens, tokens_por_linea = self.lexer.tokenize(codigo)
+        tokens, tokens_por_linea = self.tokenize(codigo)
         
         # Fase 2: Análisis semántico
         self.semantic_analyzer.analyze(tokens_por_linea)
         
-        # Deduplicar errores léxicos y semánticos
+        # Deduplicar errores
         errores = self.error_handler.deduplicate_errors()
         
         salida_ejecucion = []
         lista_de_triplos = []
         
-        # --- INICIO DE LA MODIFICACIÓN ---
-
-        # --- 3A. FASE DE EJECUCIÓN (Solo si NO hay errores) ---
         if not self.error_handler.has_errors(): 
             try:
-                # Solo ejecutamos si no hay errores semánticos
                 salida_ejecucion = self.interpreter.execute(tokens_por_linea)
             except Exception as e:
-                # Captura por si algo falla en la ejecución
                 self.error_handler.add_error(ErrorType.SEMANTICO, 0, f"Error de ejecución: {e}", "runtime")
 
-        # --- 3B. FASE DE GENERACIÓN DE TRIPLOS (Se ejecuta SIEMPRE) ---
-        # (Movido fuera del 'if not has_errors')
         try:
-            # Reiniciamos el generador para una ejecución limpia
             self.triplo_generator = TriploGenerator(self.symbol_table, self.error_handler)
             lista_de_triplos = self.triplo_generator.generate(tokens_por_linea)
+            
+            if lista_de_triplos:
+                txt_filename = f"triplos_{self.compilation_count}.txt"
+                csv_filename = f"triplos_{self.compilation_count}.csv"
+                
+                export_triplos_to_txt(lista_de_triplos, txt_filename)
+                export_triplos_to_csv(lista_de_triplos, csv_filename)
+
         except Exception as e:
-            # Captura errores *durante* la generación de triplos
             self.error_handler.add_error(ErrorType.SEMANTICO, 0, f"Error de generación de triplos: {e}", "triplo")
         
-        # --- FIN DE LA MODIFICACIÓN ---
+        self.compilation_count += 1
         
-        # Volvemos a deduplicar para incluir errores de ejecución/generación
         errores = self.error_handler.deduplicate_errors()
 
-        # Preparar información adicional
         info_adicional = {
-            "tabla_simbolos": self.symbol_table.get_tabla_final(),
+            "tabla_simbolos": self.get_tabla_final(),
             "salida_ejecucion": salida_ejecucion,
             "lista_triplos": lista_de_triplos
         }
         
         return errores, tokens, info_adicional
 
-
-# Instancia singleton del compilador
-_compilador_singleton = Compilador()
-
-
-def analizar_codigo(codigo: str) -> Tuple[List[Error], List[Token], Dict[str, Any]]:
-    """Función de conveniencia para analizar código"""
-    return _compilador_singleton.analizar_codigo(codigo)
-
-
-def obtener_tabla_simbolos(info_adicional: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
-    """Extrae la tabla de símbolos de la información adicional"""
-    return info_adicional.get("tabla_simbolos", {})
-
-
-def obtener_salida_ejecucion(info_adicional: Dict[str, Any]) -> List[str]:
-    """Extrae la salida de ejecución de la información adicional"""
-    return info_adicional.get("salida_ejecucion", [])
+# ... (El resto del archivo no necesita cambios) ...

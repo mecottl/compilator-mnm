@@ -6,12 +6,9 @@ from gui.main_window import MainWindow
 
 
 def main():
-    """Función principal para ejecutar la aplicación"""
     try:
         root = tk.Tk()
         app = MainWindow(root)
-        
-        # Ejecutar loop principal
         root.mainloop()
     
     except KeyboardInterrupt:

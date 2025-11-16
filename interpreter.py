@@ -25,6 +25,7 @@ class Interpreter:
         
         return self.output
 
+    # --- ¡INICIO DE LA MODIFICACIÓN! ---
     def _execute_block(self, stop_at_line: int):
         """
         Ejecuta un bloque de código, línea por línea, hasta
@@ -34,9 +35,28 @@ class Interpreter:
             linea, parts = self.lines_tokens[self.line_cursor]
             self.line_cursor += 1
             
-            if not parts:
+            if not parts or parts == ["}"]:
                 continue
             
+            # 0. Declaración CON Asignación (ej: \ent mnmI = 0)
+            if parts[0] in VALID_DECL_FORMS and "=" in parts:
+                try:
+                    # Encontrar el índice del nombre de la variable
+                    var_name_idx = 1
+                    if parts[var_name_idx] == ",": # Ignorar comas (sintaxis antigua)
+                        var_name_idx += 1
+                    
+                    # Crear una lista de tokens solo con la asignación
+                    # ej: de [\ent, mnmX, =, 100, -, 2] -> [mnmX, =, 100, -, 2]
+                    parts_de_asignacion = parts[var_name_idx:]
+                    self._execute_assignment(linea, parts_de_asignacion)
+                except Exception:
+                    pass # El analizador semántico ya reportó este error
+                continue
+            
+            # Si es una declaración sin asignación (ej: \ent mnmI;),
+            # la saltamos.
+
             # 1. Instrucción FOR
             if parts[0] == "for":
                 self._execute_for(linea, parts)
@@ -51,8 +71,7 @@ class Interpreter:
             if parts[0] == "print":
                 self._execute_print(linea, parts)
                 continue
-                
-            # (Omitimos declaraciones)
+    # --- FIN DE LA MODIFICACIÓN! ---
 
     def _execute_for_init(self, linea: int, init_tokens: list[str]):
         """Ejecuta la sección de inicialización de un bucle 'for'."""
@@ -96,6 +115,9 @@ class Interpreter:
             eq_pos = parts.index("=")
             var_name = parts[eq_pos - 1]
             expr_tokens = parts[eq_pos + 1:]
+
+            if expr_tokens and expr_tokens[-1] == ";":
+                expr_tokens.pop()
             
             if not self.symbol_table.esta_declarada(var_name):
                 self.error_handler.add_error("SEMANTICO", linea, f"Asignación a variable no declarada '{var_name}'", var_name)
@@ -112,19 +134,7 @@ class Interpreter:
     def _execute_for(self, linea: int, parts: list[str]):
         """Ejecuta un bucle FOR estilo C: for(init; cond; incr): { ... }"""
         
-        # 1. Parsear la cabecera del FOR
         try:
-            # (Tu lógica de parseo de la cabecera está aquí...)
-            header_str = "".join(parts[1:])
-            if not header_str.startswith("(") or not header_str.endswith("):{"):
-                raise SyntaxError("Formato de 'for' inválido. Se esperaba 'for(init; cond; incr):{'")
-            
-            content = header_str[1:-3]
-            init_str, cond_str, incr_str = content.split(";")
-
-            if parts[1] != "(":
-                 raise SyntaxError("Falta '(' después de 'for'")
-            
             idx_semicolon1 = parts.index(";")
             idx_semicolon2 = parts.index(";", idx_semicolon1 + 1)
             idx_paren_close = parts.index(")")
@@ -133,14 +143,13 @@ class Interpreter:
             cond_tokens = parts[idx_semicolon1 + 1 : idx_semicolon2]
             incr_tokens = parts[idx_semicolon2 + 1 : idx_paren_close]
             
-            if parts[idx_paren_close + 1] != ":" or parts[idx_paren_close + 2] != "{":
+            if parts[1] != "(" or parts[idx_paren_close + 1] != ":" or parts[idx_paren_close + 2] != "{":
                  raise SyntaxError("Se esperaba '):{' después de la cabecera del 'for'")
             
         except Exception as e:
             self.error_handler.add_error("SINTACTICO", linea, f"Sintaxis de 'for' inválida: {e}", "for")
             return
 
-        # 2. Encontrar el cuerpo del bucle
         start_line_idx = self.line_cursor
         body_end_line_idx = self._find_matching_brace(start_line_idx)
         
@@ -148,37 +157,27 @@ class Interpreter:
             self.error_handler.add_error("SINTACTICO", linea, "No se encontró '}' para el 'for'", "for")
             return
             
-        # 3. Ejecutar el bucle
-        
-        # --- ¡INICIO DE LA CORRECCIÓN! ---
-        # a. Ejecutar inicialización
         self._execute_for_init(linea, init_tokens)
-        # --- FIN DE LA CORRECCIÓN! ---
 
-        # b. Iniciar el bucle de condición
         loop_count = 0
         while True:
             if loop_count > 10000:
                  self.error_handler.add_error("SEMANTICO", linea, "Posible bucle infinito detectado", "for")
                  break
                  
-            # c. Evaluar condición
             condition_result = self.evaluator.evaluate(cond_tokens, linea)
             if not condition_result:
                 break
 
-            # d. Ejecutar el cuerpo del bucle
             cursor_before_body = self.line_cursor
             self.line_cursor = start_line_idx
             self._execute_block(stop_at_line=body_end_line_idx)
             self.line_cursor = cursor_before_body
             
-            # e. Ejecutar incremento
             self._execute_assignment(linea, incr_tokens)
             
             loop_count += 1
             
-        # 4. Mover el cursor principal
         self.line_cursor = body_end_line_idx
 
     def _find_matching_brace(self, start_line_idx: int) -> int:

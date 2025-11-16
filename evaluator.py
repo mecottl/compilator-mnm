@@ -35,7 +35,6 @@ class Evaluator:
         self.pos += 1
 
     def _parse_logical_or(self):
-        # Nivel más bajo de precedencia: ||
         left = self._parse_logical_and()
         while self._current_token() == "||":
             self._advance()
@@ -44,7 +43,6 @@ class Evaluator:
         return left
 
     def _parse_logical_and(self):
-        # Siguiente nivel: &&
         left = self._parse_comparison()
         while self._current_token() == "&&":
             self._advance()
@@ -53,7 +51,6 @@ class Evaluator:
         return left
 
     def _parse_comparison(self):
-        # Siguiente nivel: <, <=, >, >=, ==, !=
         left = self._parse_addition_subtraction()
         
         op_map = {"<": lambda l, r: l < r,
@@ -72,14 +69,12 @@ class Evaluator:
         return left
 
     def _parse_addition_subtraction(self):
-        # Siguiente nivel: + -
         left = self._parse_multiplication_division()
         while self._current_token() in ("+", "-"):
             op = self._current_token()
             self._advance()
             right = self._parse_multiplication_division()
             if op == "+":
-                # Manejar concatenación de cadenas
                 if isinstance(left, str) or isinstance(right, str):
                     left = str(left) + str(right)
                 else:
@@ -89,7 +84,6 @@ class Evaluator:
         return left
 
     def _parse_multiplication_division(self):
-        # Siguiente nivel: * /
         left = self._parse_primary()
         while self._current_token() in ("*", "/"):
             op = self._current_token()
@@ -101,11 +95,11 @@ class Evaluator:
                 right_val = self._get_numeric_value(right)
                 if right_val == 0:
                     raise ZeroDivisionError(f"División por cero en línea {self.linea}")
-                left = self.self._get_numeric_value(left) / right_val
+                # --- ¡AQUÍ ESTABA EL ERROR! ---
+                left = self._get_numeric_value(left) / right_val
         return left
 
     def _parse_primary(self):
-        # Nivel más alto: números, variables, (expresiones)
         token = self._current_token()
         self._advance()
         
@@ -116,7 +110,7 @@ class Evaluator:
             return float(token)
             
         if RE_CADENA.match(token):
-            return token[1:-1] # Quitar comillas
+            return token[1:-1]
             
         if RE_IDENTIFICADOR.match(token):
             if not self.symbol_table.esta_declarada(token):
@@ -140,8 +134,8 @@ class Evaluator:
         if isinstance(val, (int, float)):
             return val
         if val is None:
-            return 0 # O lanzar error, dependiendo de tus reglas
+            return 0
         try:
-            return float(val) # Intenta convertir
+            return float(val)
         except (ValueError, TypeError):
              raise TypeError(f"Operación aritmética con tipo no numérico '{val}' (tipo {type(val)})")

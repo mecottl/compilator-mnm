@@ -258,12 +258,51 @@ class MainWindow:
     
     def load_example(self):
         """Carga código de ejemplo"""
-        ejemplo = r"""\ent mnmoi = mnmNat * 3 + 7;
-\ent mnmecott = mnmNat / 2 - 5;
- for(\ent mnmx = 1;  mnmx<0 ||mnmx>15; mnmx=mnmx+1):{
-    mnmoi = mnmoi + mnmNat * mnmi;
-    mnmecott = mnmecott - mnmi / 2;
-}"""
+        ejemplo = r"""\ent mnmA = 10;
+\cad mnmB = "Hola";
+\dec mnmC;
+
+// 1. Error: Incompatibilidad de tipos (Asignación)
+// Se espera \ent, se recibe \cad
+\ent mnmErrorTipo = mnmB;
+
+// 2. Error: Incompatibilidad de tipos (Aritmética)
+// No se puede sumar \ent + \cad
+mnmErrorTipo = mnmA + mnmB;
+
+// 3. Error: Variable Indefinida (Asignación)
+// mnmVariableFantasma no existe
+mnmErrorTipo = mnmVariableFantasma;
+
+// 4. Error: Variable Usada Sin Inicializar
+// mnmC fue declarada pero no tiene valor
+mnmErrorTipo = mnmC * 2;
+
+// 5. Error: Duplicidad de Declaración
+\ent mnmA = 50;
+
+// 6. Error: Sintáctico (for mal formado)
+// Falta el '):{' al final
+for(mnmContador = 1; mnmContador < 2; mnmContador = mnmContador + 1)
+    print("Esto no funcionara");
+}
+
+// 7. Error: Sintáctico ('}' inesperado)
+// Esta llave está suelta
+}
+
+// 8. Error: Sintáctico (print mal formado)
+print "Hola";
+
+// 9. Error: Variable Indefinida (Aritmética/Lógica)
+// mnmCondicionFantasma no existe
+for(mnmI = 1; mnmI < mnmCondicionFantasma; mnmI = mnmI + 1):{
+    print("Bucle fantasma");
+}
+
+// 10. Error: División por Cero (Error de Evaluación/Runtime)
+\ent mnmCero = 0;
+\ent mnmErrorDivision = mnmA / mnmCero;"""
         
         self.editor_panel.set_code(ejemplo)
         self.status_text.set("Ejemplo cargado - Presiona 'Compilar' para probar")

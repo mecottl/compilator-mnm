@@ -31,7 +31,16 @@ class Lexer:
         tokens_por_linea: List[List[str]] = []
         
         for idx, linea in enumerate(lineas, start=1):
-            texto = linea.strip()
+            
+            # --- ¡INICIO DE LA MODIFICACIÓN! ---
+            # 1. Separar la línea por el delimitador de comentario '//'
+            #    y tomar solo la primera parte (el código).
+            linea_sin_comentarios = linea.split('//', 1)[0]
+            
+            # 2. Limpiar espacios en blanco de la línea ya sin comentarios
+            texto = linea_sin_comentarios.strip()
+            # --- FIN DE LA MODIFICACIÓN! ---
+            
             if texto == "":
                 tokens_por_linea.append([])
                 continue

@@ -1,14 +1,13 @@
-# utils/exporter.py
-# Módulo con funciones para exportar resultados a archivos.
+# Este módulo proporciona funciones para exportar la lista de triplos
+# a archivos de texto plano (.txt) y de valores separados por comas (.csv).
+#utils/exporter.py
 
 import csv
 from typing import List, Tuple
 
 def export_triplos_to_txt(triplos: List[Tuple], filename: str):
-
     try:
         with open(filename, 'w', encoding='utf-8') as f:
-            # Escribir la cabecera
             f.write(f"{'#':<5} {'Operador':<10} {'DO':<15} {'DF':<15}\n")
             f.write("-" * 47 + "\n")
             for idx, (op, arg1, arg2) in enumerate(triplos, 1):
@@ -19,17 +18,10 @@ def export_triplos_to_txt(triplos: List[Tuple], filename: str):
         print(f"Error al guardar el archivo TXT: {e}")
 
 def export_triplos_to_csv(triplos: List[Tuple], filename: str):
-    """
-    Guarda la lista de triplos en un archivo CSV.
-    """
     try:
         with open(filename, 'w', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
-            
-            # Escribir la cabecera
             writer.writerow(['#', 'Operador', 'DO', 'DF'])
-            
-            # Escribir cada triplo
             for idx, (op, arg1, arg2) in enumerate(triplos, 1):
                 arg1_str = arg1 if arg1 is not None else ""
                 arg2_str = arg2 if arg2 is not None else ""

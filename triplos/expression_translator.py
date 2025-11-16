@@ -107,14 +107,18 @@ class ExpressionTranslator:
             
         return left_arg
 
+    # Nivel de jerarquía: * / %
     def _parse_multiplication_division(self):
         left_arg = self._parse_primary()
         
-        while self._current_token() in ("*", "/"):
+        # --- ¡INICIO DE LA MODIFICACIÓN! ---
+        while self._current_token() in ("*", "/", "%"):
+        # --- FIN DE LA MODIFICACIÓN! ---
             op = self._current_token()
             self._advance()
             right_arg = self._parse_primary()
             
+            # El resto de la lógica es genérica y funciona para '%'
             temp = self._new_temp()
             self._add_triplo("=", temp, left_arg)
             self._add_triplo(op, temp, right_arg)

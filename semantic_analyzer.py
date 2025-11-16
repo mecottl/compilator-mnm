@@ -348,25 +348,46 @@ class SemanticAnalyzer:
                 return self.symbol_table.obtener_tipo(t), None
             return None, None
         
+        # --- Lógica de Inferencia de Expresión Compleja ---
         tipos_en_expresion = set()
+        has_cad = False
+        has_dec = False
+        has_ent = False
+        # --- ¡INICIO DE LA MODIFICACIÓN! ---
+        has_mod = "%" in rhs_tokens
+        # --- FIN DE LA MODIFICACIÓN! ---
+
         for t in rhs_tokens:
             tipo = None
             if RE_ENTERO.match(t):
                 tipo = "\\ent"
+                has_ent = True
             elif RE_DECIMAL.match(t):
                 tipo = "\\dec"
+                has_dec = True
             elif RE_CADENA.match(t):
                 tipo = "\\cad"
+                has_cad = True
             elif RE_IDENTIFICADOR.match(t):
                 if self.symbol_table.esta_declarada(t):
                     tipo = self.symbol_table.obtener_tipo(t)
+                    if tipo == "\\ent": has_ent = True
+                    elif tipo == "\\dec": has_dec = True
+                    elif tipo == "\\cad": has_cad = True
                 else:
                     tipos_en_expresion.add(None)
             
             if tipo:
                 tipos_en_expresion.add(CANONICAL_FROM_DECL.get(tipo, tipo))
 
-        if "/cad" in tipos_en_expresion and (len(tipos_en_expresion) > 1 or any(op in rhs_tokens for op in ['-','*','/'])):
+        # --- ¡INICIO DE LA MODIFICACIÓN! ---
+        # Regla: El módulo (%) solo funciona con enteros
+        if has_mod and (has_cad or has_dec):
+            self.error_handler.add_error(ErrorType.SEMANTICO, linea, "La operación de módulo '%' solo es válida entre enteros (\\ent)", "%")
+            return None, None
+        # --- FIN DE LA MODIFICACIÓN! ---
+
+        if "/cad" in tipos_en_expresion and (len(tipos_en_expresion) > 1 or any(op in rhs_tokens for op in ['-','*','/','%'])):
              self.error_handler.add_error(ErrorType.SEMANTICO, linea, "Incompatibilidad de tipos en expresión aritmética/cadena", " ".join(rhs_tokens))
              return None, None
         elif "/cad" in tipos_en_expresion:

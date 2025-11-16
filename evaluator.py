@@ -84,19 +84,30 @@ class Evaluator:
         return left
 
     def _parse_multiplication_division(self):
+        # Nivel de jerarquía: * / %
         left = self._parse_primary()
-        while self._current_token() in ("*", "/"):
+        
+        # --- ¡INICIO DE LA MODIFICACIÓN! ---
+        while self._current_token() in ("*", "/", "%"):
+        # --- FIN DE LA MODIFICACIÓN! ---
             op = self._current_token()
             self._advance()
             right = self._parse_primary()
+            
             if op == "*":
                 left = self._get_numeric_value(left) * self._get_numeric_value(right)
-            else: # op == "/"
+            elif op == "/":
                 right_val = self._get_numeric_value(right)
                 if right_val == 0:
                     raise ZeroDivisionError(f"División por cero en línea {self.linea}")
-                # --- ¡AQUÍ ESTABA EL ERROR! ---
                 left = self._get_numeric_value(left) / right_val
+            # --- ¡INICIO DE LA MODIFICACIÓN! ---
+            elif op == "%":
+                right_val = self._get_numeric_value(right)
+                if right_val == 0:
+                    raise ZeroDivisionError(f"División por cero (módulo) en línea {self.linea}")
+                left = self._get_numeric_value(left) % right_val
+            # --- FIN DE LA MODIFICACIÓN! ---
         return left
 
     def _parse_primary(self):

@@ -32,7 +32,8 @@ TOKEN_PATTERN = re.compile(
     
     # 5. Operadores y Símbolos (¡NUEVO Y ORDENADO!)
     r'(\|\||&&|==|!=|<=|>=|'     # Operadores multi-caracter
-    r'[=;,+\-/*()\[\]{}:<>]|'    # Operadores de un caracter
+    r'[=;,+\-/*()\[\]{}:<>]|'
+    r'[%]|' # Operadores de un caracter
     r'[!&|])'                    # Operadores lógicos de un caracter
 )
 
@@ -41,7 +42,7 @@ TOKEN_PATTERN = re.compile(
 # Añadimos todos los nuevos operadores para que _classify_token() los reconozca
 VALID_SYMBOLS = {
     # Originales
-    "=", ";", "+", "-", "/", "*", "(", ")", ",", "[", "]", "{", "}", ":",
+    "=", ";", "+", "-", "/", "*", "(", ")", ",", "[", "]", "{", "}", ":", "%",
     # Nuevos (Lógicos y Relacionales)
     "||", "&&", "==", "!=", "<=", ">=", "<", ">", "!"
 }

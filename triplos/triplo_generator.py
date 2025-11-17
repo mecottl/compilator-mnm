@@ -35,6 +35,9 @@ class TriploGenerator:
         self.triplos.append((op, arg1, arg2))
 
     def generate(self, tokens_por_linea: list[list[str]]) -> list:
+        """
+        Punto de entrada. Genera todos los triplos (SIN resolver etiquetas).
+        """
         self.triplos = []
         self.lines_tokens = list(enumerate(tokens_por_linea, start=1))
         self.line_cursor = 0
@@ -43,7 +46,8 @@ class TriploGenerator:
         
         self._generate_block(stop_at_line=len(self.lines_tokens) + 1)
         
-        return self._resolve_labels()
+        # Ya NO resolvemos las etiquetas aquí. Devolvemos la lista "sucia".
+        return self.triplos
 
     def _generate_block(self, stop_at_line: int):
         while self.line_cursor < len(self.lines_tokens) and self.line_cursor + 1 < stop_at_line:
@@ -243,13 +247,17 @@ class TriploGenerator:
             cursor += 1
         return -1
 
-    def _resolve_labels(self) -> list:
+    def resolve_labels(self, triplos_to_resolve: list) -> list:
+        """
+        Pasa final. Reemplaza etiquetas (L1) por números de línea (19)
+        y añade '...' solo si un bucle termina al final del código.
+        """
         label_map = {}
         end_loop_labels = set()
         final_triplos_no_labels = []
         
         current_index = 1
-        for op, arg1, arg2 in self.triplos:
+        for op, arg1, arg2 in triplos_to_resolve: # <--- Usa la lista de entrada
             if op == "LABEL":
                 label_map[arg1] = current_index
             elif op == "LABEL_END_LOOP":
@@ -265,14 +273,13 @@ class TriploGenerator:
             resolved_arg1 = arg1
             resolved_arg2 = arg2
             
-            if op == " " or op == "JMP":
+            if op == "JMP":
                 if arg1 == "True" or arg1 == "False":
                     resolved_arg1 = arg1
                     resolved_arg2 = label_map.get(arg2, arg2)
                 else:
                     resolved_arg1 = label_map.get(arg1, arg1)
                     resolved_arg2 = ""
-
             
             resolved_triplos.append((op, resolved_arg1, resolved_arg2))
         
@@ -285,6 +292,7 @@ class TriploGenerator:
                 break
                 
         if add_ellipsis:
-            resolved_triplos.append(("...", "...", "..."))
+            resolved_triplos.append(("...", "", ""))
                 
         return resolved_triplos
+    # --- FIN DE LA MODIFICACIÓN! ---

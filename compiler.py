@@ -1,5 +1,5 @@
 # compiler.py - Clase principal del compilador
-import os # <-- 1. IMPORTAR OS
+import os
 from typing import List, Tuple, Dict, Any
 from models import Token, Error, ErrorType
 from lexer import Lexer
@@ -9,9 +9,9 @@ from symbol_table import SymbolTable
 from interpreter import Interpreter
 from triplos.triplo_generator import TriploGenerator
 from utils.exporter import export_triplos_to_txt, export_triplos_to_csv
+from optimizer.optimizer import Optimizer
 
-# --- 2. DEFINIR EL NOMBRE DE LA CARPETA DE SALIDA ---
-TRIPLOS_OUTPUT_FOLDER = "triplos.txt"
+TRIPLOS_OUTPUT_FOLDER = "triplos_output"
 
 class Compilador:
     """Compilador principal que coordina todos los componentes"""
@@ -25,7 +25,6 @@ class Compilador:
         self.triplo_generator = TriploGenerator(self.symbol_table, self.error_handler)
         self.compilation_count = 1
         
-        # --- 3. CREAR LA CARPETA DE SALIDA SI NO EXISTE ---
         try:
             os.makedirs(TRIPLOS_OUTPUT_FOLDER, exist_ok=True)
         except Exception as e:
@@ -35,42 +34,37 @@ class Compilador:
         """
         Analiza el código fuente completo
         """
-        # Reiniciar componentes
         self.error_handler.reset()
         self.symbol_table.reset()
         self.lexer.reset()
         
-        # Fase 1: Análisis léxico
+        # Nota: 'codigo' aquí ya es el código OPTIMIZADO que viene de la GUI
         tokens, tokens_por_linea = self.lexer.tokenize(codigo)
         
-        # Fase 2: Análisis semántico
         self.semantic_analyzer.analyze(tokens_por_linea)
-        
-        # Deduplicar errores
         errores = self.error_handler.deduplicate_errors()
         
         salida_ejecucion = []
         lista_de_triplos = []
         
-        # Fase de Ejecución (Solo si NO hay errores)
         if not self.error_handler.has_errors(): 
             try:
                 salida_ejecucion = self.interpreter.execute(tokens_por_linea)
             except Exception as e:
                 self.error_handler.add_error(ErrorType.SEMANTICO, 0, f"Error de ejecución: {e}", "runtime")
 
-        # Fase de Generación de Triplos (Se ejecuta SIEMPRE)
         try:
+            # Generamos los triplos (basados en el código optimizado)
             self.triplo_generator = TriploGenerator(self.symbol_table, self.error_handler)
-            lista_de_triplos = self.triplo_generator.generate(tokens_por_linea)
+            triplos_sin_resolver = self.triplo_generator.generate(tokens_por_linea)
             
-            # --- 4. MODIFICAR LA RUTA DE EXPORTACIÓN ---
+            # Resolvemos etiquetas para obtener la lista final
+            lista_de_triplos = self.triplo_generator.resolve_labels(triplos_sin_resolver)
+            
             if lista_de_triplos:
-                # Crear nombres de archivo base
                 txt_filename_base = f"triplos_{self.compilation_count}.txt"
                 csv_filename_base = f"triplos_{self.compilation_count}.csv"
                 
-                # Unir la carpeta con el nombre de archivo
                 txt_filepath = os.path.join(TRIPLOS_OUTPUT_FOLDER, txt_filename_base)
                 csv_filepath = os.path.join(TRIPLOS_OUTPUT_FOLDER, csv_filename_base)
                 
@@ -81,13 +75,12 @@ class Compilador:
             self.error_handler.add_error(ErrorType.SEMANTICO, 0, f"Error de generación de triplos: {e}", "triplo")
         
         self.compilation_count += 1
-        
         errores = self.error_handler.deduplicate_errors()
 
-        # Preparar información adicional
         info_adicional = {
             "tabla_simbolos": self.symbol_table.get_tabla_final(),
             "salida_ejecucion": salida_ejecucion,
+            # --- CORRECCIÓN: Usar la llave 'lista_triplos' que espera la GUI ---
             "lista_triplos": lista_de_triplos
         }
         

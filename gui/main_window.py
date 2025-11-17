@@ -5,6 +5,7 @@ from gui.styles import AppStyles
 from gui.editor_panel import EditorPanel
 from gui.results_panel import ResultsPanel
 from compiler import analizar_codigo
+from text_optimizer import TextOptimizer # Asegúrate de que esta importación esté
 
 
 class MainWindow:
@@ -18,7 +19,10 @@ class MainWindow:
         self.tokens_actuales = []
         self.info_adicional = {}
         
-        # Componentes de la interfaz
+        # --- ¡INICIO DE LA MODIFICACIÓN! ---
+        self.line_map = {} # Guardará el mapa de líneas del optimizador
+        # --- FIN DE LA MODIFICACIÓN! ---
+        
         self.editor_panel = None
         self.results_panel = None
         self.status_text = None
@@ -33,7 +37,6 @@ class MainWindow:
         self.root.after(200, self._load_example_safe)
     
     def _setup_window(self):
-        """Configuración inicial de la ventana"""
         self.root.title("mnmCompilador")
         self.root.geometry("1400x900")
         self.root.minsize(1200, 700)
@@ -45,7 +48,6 @@ class MainWindow:
             pass
     
     def _setup_styles(self):
-        """Configuración de estilos"""
         style = ttk.Style()
         self.styles.setup_ttk_styles(style)
         fondo_general = "#683144"  
@@ -56,7 +58,6 @@ class MainWindow:
         style.configure("TNotebook.Tab", background=fondo_general)
         style.configure("CustomPaned.TPanedwindow", background=fondo_general)
         
-        # Opcional: estilo para etiquetas y botones (tema oscuro)
         style.configure("TLabel", background=fondo_general, foreground="white")
         style.configure("TButton", background="#2d2d2d", foreground="white")
         style.map("TButton",
@@ -64,150 +65,134 @@ class MainWindow:
                   foreground=[("active", "white")])
     
     def _create_widgets(self):
-        """Crea todos los widgets de la interfaz"""
-        # Frame principal
         main_frame = ttk.Frame(self.root)
         main_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
         main_frame.rowconfigure(1, weight=1)
         main_frame.columnconfigure(0, weight=1)
         
-        # Crear secciones
         self._create_header(main_frame)
         self._create_content_area(main_frame)
         self._create_status_bar(main_frame)
     
     def _create_header(self, parent):
-        """Crea la barra de herramientas superior"""
         header_frame = ttk.Frame(parent)
         header_frame.grid(row=0, column=0, sticky="ew", pady=(0, 5))
         
-        # Título
         title_label = ttk.Label(header_frame, text="mnmCompilador",
-                              style='Title.TLabel')
+                                style='Title.TLabel')
         title_label.grid(row=0, column=0, sticky="w")
         
-        # Botones
         button_frame = ttk.Frame(header_frame)
         button_frame.grid(row=0, column=1, sticky="e")
         
         ttk.Button(button_frame, text="Compilar",
                    command=self.compile_code).grid(row=0, column=0, padx=2)
-        
         ttk.Button(button_frame, text="Limpiar",
                    command=self.clear_all).grid(row=0, column=1, padx=2)
-        
         ttk.Button(button_frame, text="Ejemplo",
                    command=self.load_example).grid(row=0, column=2, padx=2)
         
         header_frame.columnconfigure(1, weight=1)
     
     def _create_content_area(self, parent):
-        """Crea el área principal de contenido"""
         paned_window = ttk.PanedWindow(parent, orient=tk.HORIZONTAL, style="CustomPaned.TPanedwindow")
         paned_window.grid(row=1, column=0, sticky="nsew")
         
-        # Panel izquierdo - Editor
         self.editor_panel = EditorPanel(paned_window, self.styles.colors)
         paned_window.add(self.editor_panel.frame, weight=2)
         
-        # Vincular eventos del editor
         self.editor_panel.bind_events(
             self._on_text_change,
-            self._on_scroll
+            self._on_scroll 
         )
         
-        # Panel derecho - Resultados
         self.results_panel = ResultsPanel(paned_window, self.styles.colors)
         paned_window.add(self.results_panel.frame, weight=3)
         
-        # Vincular doble click en errores
         self.results_panel.bind_error_double_click(self._goto_error_line)
     
     def _create_status_bar(self, parent):
-        """Crea la barra de estado"""
         status_frame = ttk.Frame(parent)
         status_frame.grid(row=2, column=0, sticky="ew", pady=(5, 0))
         
-        # Variables de estado
         self.status_text = tk.StringVar()
         self.status_text.set("Listo para compilar")
-        
         self.info_text = tk.StringVar()
         self.info_text.set("Líneas: 0 | Errores: 0 | Tokens: 0")
         
-        # Etiquetas
         ttk.Label(status_frame, textvariable=self.status_text).grid(
             row=0, column=0, sticky="w"
         )
-        
         info_frame = ttk.Frame(status_frame)
         info_frame.grid(row=0, column=1, sticky="e")
-        
         ttk.Label(info_frame, textvariable=self.info_text).grid(
             row=0, column=0
         )
-        
         status_frame.columnconfigure(1, weight=1)
     
     # ========== EVENTOS ==========
     
     def _on_text_change(self, event=None):
-        """Maneja cambios en el texto"""
         try:
-            self.editor_panel.update_line_numbers()
+            self.editor_panel.update_line_numbers(optimized=False)
             self._update_status()
         except:
             pass
     
-    def _on_scroll(self, event):
-        """Maneja el scroll del mouse"""
+    def _on_scroll(self, event, editor, line_numbers):
         try:
             delta = int(-1 * (event.delta / 120))
-            self.editor_panel.line_numbers.yview_scroll(delta, "units")
-            self.editor_panel.text_editor.yview_scroll(delta, "units")
+            line_numbers.yview_scroll(delta, "units")
+            editor.yview_scroll(delta, "units")
         except:
             pass
     
     def _goto_error_line(self, event):
-        """Va a la línea del error al hacer doble click"""
-        linea = self.results_panel.get_selected_error_line()
-        if linea > 0:
-            self.editor_panel.goto_line(linea)
+        """Va a la línea del error, mapeándola al código original."""
+        linea_optimizada = self.results_panel.get_selected_error_line()
+        
+        linea_original = self.line_map.get(linea_optimizada, 0)
+        
+        if linea_original > 0:
+            self.editor_panel.goto_line(linea_original)
+            
     
     # ========== ACCIONES ==========
     
     def compile_code(self):
         """Compila el código actual"""
         try:
-            codigo = self.editor_panel.get_code()
+            codigo_original = self.editor_panel.get_code()
             
-            if not codigo.strip():
+            if not codigo_original.strip():
                 messagebox.showwarning("Advertencia", "No hay código para compilar")
                 return
             
-            # Actualizar estado
-            self.status_text.set("Compilando...")
+            self.status_text.set("Optimizando y compilando...")
             self.root.update()
             
-            # Limpiar errores visuales anteriores
             self.editor_panel.clear_error_highlights()
             
-            # Ejecutar análisis
-            self.errores_actuales, self.tokens_actuales, self.info_adicional = \
-                analizar_codigo(codigo)
+            # --- PASO 1: OPTIMIZACIÓN DE TEXTO ---
+            optimizer = TextOptimizer(codigo_original)
+            codigo_optimizado, self.line_map = optimizer.optimize()
             
-            # Actualizar interfaz
+            self.editor_panel.set_optimized_code(codigo_optimizado)
+            
+            # --- PASO 2: ANÁLISIS (SOBRE EL CÓDIGO OPTIMIZADO) ---
+            self.errores_actuales, self.tokens_actuales, self.info_adicional = \
+                analizar_codigo(codigo_optimizado)
+            
             self._show_results()
             
-            # Actualizar estado
             if self.errores_actuales:
                 self.status_text.set(
                     f"Compilación completada con {len(self.errores_actuales)} error(es)"
                 )
-                self.results_panel.select_tab(0)  # Pestaña de errores
+                self.results_panel.select_tab(0)
             else:
                 self.status_text.set("Compilación exitosa - Código analizado")
-                self.results_panel.select_tab(2)  # Pestaña de salida
+                self.results_panel.select_tab(2)
             
             self._update_status()
         
@@ -217,95 +202,74 @@ class MainWindow:
     
     def _show_results(self):
         """Muestra los resultados de la compilación"""
-        # Mostrar errores
         self.results_panel.show_errors(self.errores_actuales)
         
-        # Resaltar líneas con error
         for error in self.errores_actuales:
             if hasattr(error, 'linea') and error.linea:
-                self.editor_panel.highlight_error_line(error.linea)
+                linea_original = self.line_map.get(error.linea, 0)
+                if linea_original > 0:
+                    self.editor_panel.highlight_error_line(linea_original)
         
-        # Mostrar tabla de símbolos
         tabla_simbolos = self.info_adicional.get('tabla_simbolos', {})
         self.results_panel.show_symbols(tabla_simbolos)
         
-        # Mostrar salida
         salida = self.info_adicional.get('salida_ejecucion', [])
         self.results_panel.show_output(salida, len(self.errores_actuales) > 0)
         
-        # --- ¡INICIO DE LA MODIFICACIÓN! ---
-        # Mostrar triplos
+        # --- MODIFICACIÓN ---
+        # Solo mostramos una lista de triplos (la optimizada)
         lista_triplos = self.info_adicional.get('lista_triplos', [])
         self.results_panel.show_triplos(lista_triplos)
-        # --- FIN DE LA MODIFICACIÓN! ---
+        # --------------------
     
     def clear_all(self):
         """Limpia todo el contenido"""
-        # Limpiar editor
         self.editor_panel.clear()
-        
-        # Limpiar resultados
         self.results_panel.clear_all()
         
-        # Reiniciar variables
         self.errores_actuales = []
         self.tokens_actuales = []
         self.info_adicional = {}
+        self.line_map = {}
         
-        # Actualizar estado
         self.status_text.set("Todo limpiado - Listo para nuevo código")
         self._update_status()
     
     def load_example(self):
         """Carga código de ejemplo"""
-        ejemplo = r"""\ent mnmA = 10;
-\cad mnmB = "Hola";
-\dec mnmC;
-
-// 1. Error: Incompatibilidad de tipos (Asignación)
-// Se espera \ent, se recibe \cad
-\ent mnmErrorTipo = mnmB;
-
-// 2. Error: Incompatibilidad de tipos (Aritmética)
-// No se puede sumar \ent + \cad
-mnmErrorTipo = mnmA + mnmB;
-
-// 3. Error: Variable Indefinida (Asignación)
-// mnmVariableFantasma no existe
-mnmErrorTipo = mnmVariableFantasma;
-
-// 4. Error: Variable Usada Sin Inicializar
-// mnmC fue declarada pero no tiene valor
-mnmErrorTipo = mnmC * 2;
-
-// 5. Error: Duplicidad de Declaración
-\ent mnmA = 50;
-
-// 6. Error: Sintáctico (for mal formado)
-// Falta el '):{' al final
-for(mnmContador = 1; mnmContador < 2; mnmContador = mnmContador + 1)
-    print("Esto no funcionara");
+        ejemplo = r"""\ent mnmA, mnmB, mnmC, mnmD, mnmContador, mnmVal; 
+ 
+\dec mnmX, mnmY, mnmZ,mnml; 
+ 
+\cad mnmS1, mnmS2, mnmS3; 
+ 
+mnmA = 13 
+mnmB = 105 
+mnmC =  mnmA + mnmB;  
+ 
+mnmX = 100-2 
+mnmY = 0.05 
+ 
+mnmS1 = "Hola" 
+mnmS2 = "Mundo" 
+  
+mnmVal= 100-2; 
+ 
+mnmD = mnmA + mnmB;  
+ 
+mnmS3 = "Hola"; 
+ 
+print(mnmS3); 
+ 
+mnmZ = 66 * mnmVal;  
+ 
+for(mnmContador = 1; mnmContador <= mnmD; mnmContador = mnmContador + 1):{ 
+    print(mnmZ)
 }
-
-// 7. Error: Sintáctico ('}' inesperado)
-// Esta llave está suelta
-}
-
-// 8. Error: Sintáctico (print mal formado)
-print "Hola";
-
-// 9. Error: Variable Indefinida (Aritmética/Lógica)
-// mnmCondicionFantasma no existe
-for(mnmI = 1; mnmI < mnmCondicionFantasma; mnmI = mnmI + 1):{
-    print("Bucle fantasma");
-}
-
-// 10. Error: División por Cero (Error de Evaluación/Runtime)
-\ent mnmCero = 0;
-\ent mnmErrorDivision = mnmA / mnmCero;"""
+"""
         
         self.editor_panel.set_code(ejemplo)
-        self.status_text.set("Ejemplo cargado - Presiona 'Compilar' para probar")
+        self.status_text.set("Ejemplo de optimización cargado - Presiona 'Compilar'")
         self._update_status()
     
     def _load_example_safe(self):

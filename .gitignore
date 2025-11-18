@@ -1,0 +1,6 @@
+# Ignorar caché de Python
+__pycache__/
+*.pyc
+
+# Ignorar carpetas de output/log no rastreadas
+triplos_output/

@@ -409,7 +409,8 @@ class SemanticAnalyzer:
         rhs_tipo_norm = CANONICAL_FROM_DECL.get(rhs_tipo, rhs_tipo)
         
         compatible = (
-            (lhs_tipo_norm == "/ent" and rhs_tipo_norm == "/ent") or
+            # CAMBIO AQUÍ: Permitimos asignar /dec a /ent (truncamiento implícito)
+            (lhs_tipo_norm == "/ent" and rhs_tipo_norm in ("/ent", "/dec")) or
             (lhs_tipo_norm == "/dec" and rhs_tipo_norm in ("/ent", "/dec")) or
             (lhs_tipo_norm == "/cad" and rhs_tipo_norm == "/cad")
         )

@@ -1,6 +1,3 @@
-# Este módulo proporciona funciones para exportar la lista de triplos
-# a archivos de texto plano (.txt) y de valores separados por comas (.csv).
-#utils/exporter.py
 
 import csv
 from typing import List, Tuple

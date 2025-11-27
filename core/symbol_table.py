@@ -1,6 +1,6 @@
 # symbol_table.py - Tabla de símbolos del compilador
 from typing import Dict, Any, Optional
-from constants import RE_IDENTIFICADOR, RE_ENTERO, RE_DECIMAL, RE_CADENA, KEYWORDS, VALID_DECL_FORMS, INVALID_DECL_FORMS
+from .constants import RE_IDENTIFICADOR, RE_ENTERO, RE_DECIMAL, RE_CADENA, KEYWORDS, VALID_DECL_FORMS, INVALID_DECL_FORMS
 
 
 class SymbolTable:

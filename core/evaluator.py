@@ -1,7 +1,7 @@
 # evaluator.py - Evaluador de Expresiones Aritméticas y Lógicas
 import math
-from symbol_table import SymbolTable
-from constants import RE_IDENTIFICADOR, RE_ENTERO, RE_DECIMAL, RE_CADENA
+from .symbol_table import SymbolTable
+from .constants import RE_IDENTIFICADOR, RE_ENTERO, RE_DECIMAL, RE_CADENA
 
 class Evaluator:
     """Evalúa expresiones infijas (ej: 'mnmx + 1 * 2')"""

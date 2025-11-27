@@ -1,8 +1,8 @@
 # interpreter.py - Módulo de ejecución de código
-from symbol_table import SymbolTable
-from evaluator import Evaluator
-from error_handler import ErrorHandler
-from constants import VALID_DECL_FORMS, RE_IDENTIFICADOR, CANONICAL_FROM_DECL
+from .symbol_table import SymbolTable
+from .evaluator import Evaluator
+from .error_handler import ErrorHandler
+from .constants import VALID_DECL_FORMS, RE_IDENTIFICADOR, CANONICAL_FROM_DECL
 
 class Interpreter:
     """Ejecuta el código estructurado (con bloques)"""

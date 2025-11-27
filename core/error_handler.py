@@ -1,6 +1,6 @@
 # error_handler.py - Gestión de errores del compilador
 from typing import List, Optional
-from models import Error, ErrorType
+from .models import Error, ErrorType
 
 
 class ErrorHandler:

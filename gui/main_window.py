@@ -4,8 +4,8 @@ from tkinter import ttk, messagebox
 from gui.styles import AppStyles
 from gui.editor_panel import EditorPanel
 from gui.results_panel import ResultsPanel
-from compiler import analizar_codigo
-from text_optimizer import TextOptimizer # Asegúrate de que esta importación esté
+from core.compiler import analizar_codigo
+from optimizer.text_optimizer import TextOptimizer # Asegúrate de que esta importación esté
 
 
 class MainWindow:

@@ -2,7 +2,7 @@
 import tkinter as tk
 from tkinter import ttk, scrolledtext
 from typing import List, Dict, Any
-from models import Error
+from core.models import Error
 
 
 class ResultsPanel:
@@ -139,7 +139,7 @@ class ResultsPanel:
             self.error_tree.insert('', 'end', values=(error.token, lexema, renglon, descripcion))
     
     def show_symbols(self, tabla_simbolos: Dict[str, Dict[str, Any]]):
-        from constants import CANONICAL_TO_SOURCE
+        from core.constants import CANONICAL_TO_SOURCE
         for item in self.token_tree.get_children(): self.token_tree.delete(item)
         for nombre, info in tabla_simbolos.items():
             tipo_dato = info.get('tipo', '')

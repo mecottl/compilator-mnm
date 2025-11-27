@@ -1,9 +1,9 @@
 # triplos/triplo_generator.py
 # Genera la lista completa de triplos para todo el programa.
 
-from symbol_table import SymbolTable
-from error_handler import ErrorHandler
-from constants import VALID_DECL_FORMS, RE_IDENTIFICADOR, CANONICAL_FROM_DECL
+from core.symbol_table import SymbolTable
+from core.error_handler import ErrorHandler
+from core.constants import VALID_DECL_FORMS, RE_IDENTIFICADOR, CANONICAL_FROM_DECL
 from .expression_translator import ExpressionTranslator
 
 class TriploGenerator:

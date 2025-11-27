@@ -1,20 +1,20 @@
 # compiler.py - Clase principal del compilador
 import os
 from typing import List, Tuple, Dict, Any
-from models import Token, Error, ErrorType
-from lexer import Lexer
-from semantic_analyzer import SemanticAnalyzer
-from error_handler import ErrorHandler
-from symbol_table import SymbolTable
-from interpreter import Interpreter
+from .models import Token, Error, ErrorType
+from .lexer import Lexer
+from .semantic_analyzer import SemanticAnalyzer
+from .error_handler import ErrorHandler
+from .symbol_table import SymbolTable
+from .interpreter import Interpreter
+
+from optimizer.text_optimizer import TextOptimizer
 from triplos.triplo_generator import TriploGenerator
 from utils.exporter import export_triplos_to_txt, export_triplos_to_csv
 
 TRIPLOS_OUTPUT_FOLDER = "triplos_output"
 
-class Compilador:
-    """Compilador principal que coordina todos los componentes"""
-    
+class Compilador:    
     def __init__(self):
         self.error_handler = ErrorHandler()
         self.symbol_table = SymbolTable()

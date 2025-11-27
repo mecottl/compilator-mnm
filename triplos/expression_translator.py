@@ -2,9 +2,9 @@
 # Traduce tokens de expresión a triplos, respetando la jerarquía
 # de operaciones y usando temporales de forma explícita.
 
-from symbol_table import SymbolTable
-from error_handler import ErrorHandler
-from constants import RE_IDENTIFICADOR, RE_ENTERO, RE_DECIMAL, RE_CADENA
+from core.symbol_table import SymbolTable
+from core.error_handler import ErrorHandler
+from core.constants import RE_IDENTIFICADOR, RE_ENTERO, RE_DECIMAL, RE_CADENA
 
 class ExpressionTranslator:
     def __init__(self, symbol_table: SymbolTable, error_handler: ErrorHandler):

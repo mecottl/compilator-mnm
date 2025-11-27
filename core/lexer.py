@@ -1,7 +1,7 @@
 # lexer.py - Análisis léxico (tokenización)
 from typing import List, Tuple
-from models import Token
-from constants import (
+from .models import Token
+from .constants import (
     TOKEN_PATTERN, RE_IDENTIFICADOR, RE_ENTERO, RE_DECIMAL, RE_CADENA,
     VALID_DECL_FORMS, INVALID_DECL_FORMS, KEYWORDS, VALID_SYMBOLS
 )

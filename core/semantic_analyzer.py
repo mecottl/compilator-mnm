@@ -1,10 +1,10 @@
 # semantic_analyzer.py - Análisis semántico (Corregido: Registro de llave de cierre)
 
 from typing import List, Tuple, Optional, Any
-from models import ErrorType
-from error_handler import ErrorHandler
-from symbol_table import SymbolTable
-from constants import (
+from .models import ErrorType
+from .error_handler import ErrorHandler
+from .symbol_table import SymbolTable
+from .constants import (
     RE_IDENTIFICADOR, RE_ENTERO, RE_DECIMAL, RE_CADENA,
     VALID_DECL_FORMS, INVALID_DECL_FORMS, CANONICAL_FROM_DECL, CANONICAL_TO_SOURCE,
     VALID_SYMBOLS

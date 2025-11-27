@@ -2,13 +2,10 @@
 import tkinter as tk
 from tkinter import ttk, scrolledtext
 
-# --- ¡IMPORTANTE! ESTO DEBE COINCIDIR CON text_optimizer.py ---
 OPTIMIZED_PREFIX = "//OPTIMIZADO: " 
 
 class EditorPanel:
-    """
-    Panel del editor con pestañas para "Original" y "Optimizado".
-    """
+
     
     def __init__(self, parent, colors: dict):
         self.colors = colors

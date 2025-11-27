@@ -9,7 +9,6 @@ from symbol_table import SymbolTable
 from interpreter import Interpreter
 from triplos.triplo_generator import TriploGenerator
 from utils.exporter import export_triplos_to_txt, export_triplos_to_csv
-from optimizer.optimizer import Optimizer
 
 TRIPLOS_OUTPUT_FOLDER = "triplos_output"
 

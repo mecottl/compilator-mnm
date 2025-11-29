@@ -8,8 +8,11 @@ from .error_handler import ErrorHandler
 from .symbol_table import SymbolTable
 from .interpreter import Interpreter
 
+from ensamblador.assembler_generator import AssemblerGenerator
+
 from optimizer.text_optimizer import TextOptimizer
 from triplos.triplo_generator import TriploGenerator
+
 from utils.exporter import export_triplos_to_txt, export_triplos_to_csv
 
 TRIPLOS_OUTPUT_FOLDER = "triplos_output"
@@ -23,6 +26,7 @@ class Compilador:
         self.interpreter = Interpreter(self.symbol_table, self.error_handler)
         self.triplo_generator = TriploGenerator(self.symbol_table, self.error_handler)
         self.compilation_count = 1
+        self.assembler_generator = AssemblerGenerator()
         
         try:
             os.makedirs(TRIPLOS_OUTPUT_FOLDER, exist_ok=True)
@@ -75,14 +79,18 @@ class Compilador:
         
         self.compilation_count += 1
         errores = self.error_handler.deduplicate_errors()
-
-        info_adicional = {
-            "tabla_simbolos": self.symbol_table.get_tabla_final(),
-            "salida_ejecucion": salida_ejecucion,
-            # --- CORRECCIÓN: Usar la llave 'lista_triplos' que espera la GUI ---
-            "lista_triplos": lista_de_triplos
-        }
         
+        codigo_ensamblador = ""
+            
+        if lista_de_triplos:
+             # Generar ASM (ya no pasamos symbol_table)
+             codigo_ensamblador = self.assembler_generator.generate(lista_de_triplos)
+             
+        info_adicional = {
+            # ... (otros)
+            "lista_triplos": lista_de_triplos,
+            "codigo_ensamblador": codigo_ensamblador # <--- Nuevo dato
+        }
         return errores, tokens, info_adicional
 
 

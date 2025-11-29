@@ -216,11 +216,11 @@ class MainWindow:
         salida = self.info_adicional.get('salida_ejecucion', [])
         self.results_panel.show_output(salida, len(self.errores_actuales) > 0)
         
-        # --- MODIFICACIÓN ---
-        # Solo mostramos una lista de triplos (la optimizada)
+
         lista_triplos = self.info_adicional.get('lista_triplos', [])
         self.results_panel.show_triplos(lista_triplos)
-        # --------------------
+        codigo_asm = self.info_adicional.get('codigo_ensamblador', "")
+        self.results_panel.show_assembler(codigo_asm)
     
     def clear_all(self):
         """Limpia todo el contenido"""

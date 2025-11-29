@@ -16,7 +16,8 @@ class ResultsPanel:
         self.error_tree = None
         self.token_tree = None
         self.output_text = None
-        self.triple_tree = None # Volvemos a un solo árbol
+        self.triple_tree = None 
+        self.assembler_text = None
         
         self._create_widgets()
     
@@ -27,7 +28,31 @@ class ResultsPanel:
         self._create_errors_tab()
         self._create_tokens_tab()
         self._create_output_tab()
-        self._create_triplos_tab() # Solo una pestaña
+        self._create_triplos_tab()
+        self._create_assembler_tab()
+        
+    def _create_assembler_tab(self):
+        asm_frame = ttk.Frame(self.notebook)
+        self.notebook.add(asm_frame, text="⚙️ Ensamblador")
+        
+        asm_frame.rowconfigure(1, weight=1)
+        asm_frame.columnconfigure(0, weight=1)
+        
+        asm_label = ttk.Label(asm_frame, text="Código Objeto (8086):", style='Title.TLabel')
+        asm_label.grid(row=0, column=0, sticky="w", padx=5, pady=5)
+        
+        self.assembler_text = scrolledtext.ScrolledText(
+            asm_frame, wrap=tk.NONE, font=('Consolas', 10),
+            background=self.colors['bg_editor'], foreground='#AADDFF', # Azulito estilo ASM
+            state='disabled', relief='flat'
+        )
+        self.assembler_text.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+
+    def show_assembler(self, asm_code: str):
+        self.assembler_text.config(state='normal')
+        self.assembler_text.delete('1.0', 'end')
+        self.assembler_text.insert('1.0', asm_code)
+        self.assembler_text.config(state='disabled')
     
     def _create_errors_tab(self):
         # (Igual que antes...)
@@ -164,6 +189,9 @@ class ResultsPanel:
         self.output_text.config(state='normal')
         self.output_text.delete('1.0', 'end')
         self.output_text.config(state='disabled')
+        self.assembler_text.config(state='normal')
+        self.assembler_text.delete('1.0', 'end')
+        self.assembler_text.config(state='disabled')
 
     def select_tab(self, index: int): self.notebook.select(index)
     def bind_error_double_click(self, callback): self.error_tree.bind('<Double-1>', callback)

@@ -1,6 +1,6 @@
 # optimizer/text_optimizer.py
 # Módulo para optimizar el código fuente (mnm).
-# VERSIÓN: Con aislamiento de ámbito para ciclos FOR (Scopes).
+# VERSIÓN: Orden corregido (Propaga en Header -> Invalida para Bloque).
 
 import re
 
@@ -15,7 +15,6 @@ class TextOptimizer:
         self.original_lines = source_code.splitlines()
         self.optimized_lines = []
         
-        # Diccionarios de conocimiento
         self.known_expressions = {} 
         self.variable_to_expressions = {}
         self.copies = {}
@@ -118,20 +117,16 @@ class TextOptimizer:
         for original_line_index, line in enumerate(self.original_lines, 1):
             clean_line = line.strip()
 
-            # --- REGLA DE SEGURIDAD DE ÁMBITO (SCOPES) ---
-            
-            # 1. Entrada al Ciclo: Olvidar lo de afuera
-            # (Detectamos 'for' y apertura de bloque '{')
-            if "for" in clean_line and "{" in clean_line:
-                self._invalidate_all()
-
-            # 2. Salida del Ciclo: Olvidar lo de adentro
-            # (Detectamos el cierre de bloque '}')
+            # --- CASO 1: FIN DE BLOQUE '}' ---
+            # Si cerramos un bloque, olvidamos todo lo que pasó dentro.
             if clean_line == "}":
                 self._invalidate_all()
+                self.optimized_lines.append(line)
+                self.line_map[optimized_line_index] = original_line_index
+                optimized_line_index += 1
+                continue
 
-            # ---------------------------------------------
-
+            # --- CASO 2: ASIGNACIONES Y DECLARACIONES ---
             match = ASSIGNMENT_REGEX.match(line)
             match_decl = re.match(r"^\s*(\\[a-z]+)\s+(mnm[A-Za-z0-9_]+)\s*=\s*(.*?);?\s*$", line)
             
@@ -147,44 +142,47 @@ class TextOptimizer:
                 target_var = match_decl.group(2).strip()
                 raw_expr = match_decl.group(3).strip()
             
+            # --- CASO 3: LÍNEAS SIN ASIGNACIÓN (FOR, PRINT, ETC) ---
             if not target_var:
+                # 1. PRIMERO propagamos (Aplicamos optimización al Header del FOR)
                 line_propagated = self._propagate_values(line)
                 
                 self.optimized_lines.append(line_propagated)
                 self.line_map[optimized_line_index] = original_line_index
                 optimized_line_index += 1
                 
+                # Invalidador de declaración simple
                 simple_decl = re.match(r"^\s*(\\[a-z]+)\s+(mnm[A-Za-z0-9_]+)", line)
                 if simple_decl:
                     self._invalidate_expressions(simple_decl.group(2))
+                
+                # 2. DESPUÉS invalidamos (Protegemos el cuerpo del FOR)
+                # Si entramos a un ciclo, borramos la memoria AHORA, para que 
+                # las líneas siguientes (cuerpo) no usen valores de afuera.
+                if "for" in clean_line and "{" in clean_line:
+                    self._invalidate_all()
+                
                 continue
 
-            # --- PROCESO DE OPTIMIZACIÓN ---
+            # --- PROCESO DE OPTIMIZACIÓN (ASIGNACIONES) ---
             expression = self._propagate_values(raw_expr)
-            # Math folding desactivado
-            
             expr_normalized = self._normalize(expression)
             
             self._invalidate_expressions(target_var)
 
             if expr_normalized in self.known_expressions:
-                # OPTIMIZACIÓN: Expresión repetida en el ámbito actual
+                # OPTIMIZACIÓN
                 original_var = self.known_expressions[expr_normalized]
-                
                 self.optimized_lines.append(f"{OPTIMIZED_PREFIX}{line.strip()}")
                 self.line_map[optimized_line_index] = original_line_index
                 optimized_line_index += 1
-                
                 self.copies[target_var] = original_var
-
             else:
-                # NUEVO CONOCIMIENTO (Válido solo en el ámbito actual)
+                # NUEVO CONOCIMIENTO
                 new_line = f"{prefix}{target_var} = {expression};"
-                
                 self.optimized_lines.append(new_line)
                 self.line_map[optimized_line_index] = original_line_index
                 optimized_line_index += 1
-                
                 self.known_expressions[expr_normalized] = target_var
                 
                 if not (expression.startswith('"') or expression.startswith("'")):

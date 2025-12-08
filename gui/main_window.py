@@ -247,13 +247,13 @@ mnmA = 13
 mnmB = 105 
 mnmC =  mnmA + mnmB;  
  
-mnmX = 100-2 
+mnmX = 100 - 2 
 mnmY = 0.05 
  
 mnmS1 = "Hola" 
 mnmS2 = "Mundo" 
   
-mnmVal= 100-2; 
+mnmVal= 100 - 2; 
  
 mnmD = mnmA + mnmB;  
  

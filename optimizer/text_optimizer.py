@@ -1,10 +1,5 @@
-# optimizer/text_optimizer.py
-# Módulo para optimizar el código fuente (mnm).
-# VERSIÓN: Orden corregido (Propaga en Header -> Invalida para Bloque).
-
 import re
 
-# Regex para encontrar asignaciones
 ASSIGNMENT_REGEX = re.compile(r"^\s*(mnm[A-Za-z0-9_]+)\s*=\s*(.*?);?\s*$")
 VAR_REGEX = re.compile(r"(mnm[A-Za-z0-9_]+)")
 
@@ -21,10 +16,8 @@ class TextOptimizer:
         self.line_map = {}
 
     def _normalize(self, expr: str) -> str:
-        """Normaliza la expresión para detectar conmutatividad."""
         expr = expr.strip()
         
-        # 1. Quitar paréntesis externos
         while expr.startswith('(') and expr.endswith(')'):
             depth = 0
             is_wrapped = True
@@ -39,16 +32,13 @@ class TextOptimizer:
             else:
                 break
 
-        # 2. Si es cadena o tiene división, no tocar
         if any(c in expr for c in ['"', "'", '/']):
             return expr.replace(" ", "")
         
-        # 3. Limpiar espacios
         expr_clean = expr.replace(" ", "")
         if not (expr_clean.startswith('+') or expr_clean.startswith('-')):
             expr_clean = "+" + expr_clean
             
-        # 4. Separar en TÉRMINOS
         terms = re.findall(r'[+-][^+-]+', expr_clean)
         
         if len("".join(terms)) != len(expr_clean):
@@ -59,7 +49,6 @@ class TextOptimizer:
             sign = term[0] 
             content = term[1:] 
             
-            # 5. Separar en FACTORES
             if '*' in content and '(' not in content:
                 factors = content.split('*')
                 factors.sort() 
@@ -67,7 +56,6 @@ class TextOptimizer:
             
             normalized_terms.append(sign + content)
             
-        # 6. Ordenar términos
         normalized_terms.sort()
         
         return "".join(normalized_terms)
@@ -102,7 +90,6 @@ class TextOptimizer:
                 del self.copies[copy_var]
 
     def _invalidate_all(self):
-        """Reinicia la memoria del optimizador (Cambio de Ámbito)."""
         self.known_expressions.clear()
         self.variable_to_expressions.clear()
         self.copies.clear()
@@ -117,8 +104,6 @@ class TextOptimizer:
         for original_line_index, line in enumerate(self.original_lines, 1):
             clean_line = line.strip()
 
-            # --- CASO 1: FIN DE BLOQUE '}' ---
-            # Si cerramos un bloque, olvidamos todo lo que pasó dentro.
             if clean_line == "}":
                 self._invalidate_all()
                 self.optimized_lines.append(line)
@@ -126,7 +111,6 @@ class TextOptimizer:
                 optimized_line_index += 1
                 continue
 
-            # --- CASO 2: ASIGNACIONES Y DECLARACIONES ---
             match = ASSIGNMENT_REGEX.match(line)
             match_decl = re.match(r"^\s*(\\[a-z]+)\s+(mnm[A-Za-z0-9_]+)\s*=\s*(.*?);?\s*$", line)
             
@@ -142,43 +126,34 @@ class TextOptimizer:
                 target_var = match_decl.group(2).strip()
                 raw_expr = match_decl.group(3).strip()
             
-            # --- CASO 3: LÍNEAS SIN ASIGNACIÓN (FOR, PRINT, ETC) ---
             if not target_var:
-                # 1. PRIMERO propagamos (Aplicamos optimización al Header del FOR)
                 line_propagated = self._propagate_values(line)
                 
                 self.optimized_lines.append(line_propagated)
                 self.line_map[optimized_line_index] = original_line_index
                 optimized_line_index += 1
                 
-                # Invalidador de declaración simple
                 simple_decl = re.match(r"^\s*(\\[a-z]+)\s+(mnm[A-Za-z0-9_]+)", line)
                 if simple_decl:
                     self._invalidate_expressions(simple_decl.group(2))
                 
-                # 2. DESPUÉS invalidamos (Protegemos el cuerpo del FOR)
-                # Si entramos a un ciclo, borramos la memoria AHORA, para que 
-                # las líneas siguientes (cuerpo) no usen valores de afuera.
                 if "for" in clean_line and "{" in clean_line:
                     self._invalidate_all()
                 
                 continue
 
-            # --- PROCESO DE OPTIMIZACIÓN (ASIGNACIONES) ---
             expression = self._propagate_values(raw_expr)
             expr_normalized = self._normalize(expression)
             
             self._invalidate_expressions(target_var)
 
             if expr_normalized in self.known_expressions:
-                # OPTIMIZACIÓN
                 original_var = self.known_expressions[expr_normalized]
                 self.optimized_lines.append(f"{OPTIMIZED_PREFIX}{line.strip()}")
                 self.line_map[optimized_line_index] = original_line_index
                 optimized_line_index += 1
                 self.copies[target_var] = original_var
             else:
-                # NUEVO CONOCIMIENTO
                 new_line = f"{prefix}{target_var} = {expression};"
                 self.optimized_lines.append(new_line)
                 self.line_map[optimized_line_index] = original_line_index

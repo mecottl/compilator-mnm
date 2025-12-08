@@ -1,6 +1,3 @@
-# ensamblador/assembler_generator.py
-# Generador Final: JMP corregido (apunta a ETIQUETA correcta) y Regla de Oro.
-
 class AssemblerGenerator:
     def __init__(self):
         self.lines = []
@@ -16,19 +13,15 @@ class AssemblerGenerator:
         self.is_16bit = False
         self.result_in_ah = False
         
-        # 1. Identificar etiquetas (Pasada robusta)
         unique_targets = set()
         for op, arg1, arg2 in triplos:
-            # Detectamos el destino correcto
             if op == "JMP" or (op == "" and arg1 in ["True", "False"]):
-                # Si es condicional (True/False), destino en arg2. Si es JMP, destino en arg1.
                 target = arg2 if arg1 in ["True", "False"] else arg1
                 
                 target_str = str(target).replace("Et", "").strip()
                 if target_str.isdigit():
                      unique_targets.add(int(target_str))
         
-        # 2. Asignar nombres ETIQUETAx secuenciales
         for idx, line_num in enumerate(sorted(unique_targets), start=1):
             self.labels[line_num] = f"ETIQUETA{idx}"
 
@@ -39,20 +32,17 @@ class AssemblerGenerator:
                 skip_counter -= 1
                 continue
 
-            # --- GESTIÓN DE ETIQUETA EN LÍNEA ---
             current_label_prefix = ""
             line_num = i + 1 
             if line_num in self.labels:
                 current_label_prefix = f"{self.labels[line_num]}: "
 
-            # --- DETECCIÓN: CARGA PARA DIVISIÓN/MÓDULO (FORCE AX) ---
             force_ax_load = False
             if op == "=" and not self._is_temp(arg2) and i + 1 < len(triplos):
                 next_op, next_arg1, _ = triplos[i+1]
                 if next_op in ['/', '%'] and next_arg1 == arg1:
                     force_ax_load = True
 
-            # --- LOOKAHEAD INTELIGENTE ---
             smart_op_done = False
             if op == "=" and not self._is_temp(arg2) and i + 1 < len(triplos) and not force_ax_load:
                 next_op, next_arg1, next_arg2 = triplos[i+1]
@@ -189,12 +179,7 @@ class AssemblerGenerator:
             self._add_line(f"CMP AL, {op2}", label_prefix)
             self.last_compare_op = op
 
-        # --- CORRECCIÓN FINAL EN SALTOS ---
         elif op == "JMP" or (op == "" and arg1 in ["True", "False"]):
-            
-            # ¡AQUÍ ESTABA EL ERROR!
-            # Si es JMP (incondicional), el destino está en arg1.
-            # Si es Condicional (True/False), el destino está en arg2.
             target_val = arg2 if arg1 in ["True", "False"] else arg1
             
             raw_target = str(target_val).replace("Et", "").strip()

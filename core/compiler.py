@@ -9,10 +9,8 @@ from .symbol_table import SymbolTable
 from .interpreter import Interpreter
 
 from ensamblador.assembler_generator import AssemblerGenerator
-
 from optimizer.text_optimizer import TextOptimizer
 from triplos.triplo_generator import TriploGenerator
-
 from utils.exporter import export_triplos_to_txt, export_triplos_to_csv
 
 TRIPLOS_OUTPUT_FOLDER = "triplos_output"
@@ -44,7 +42,7 @@ class Compilador:
         # Nota: 'codigo' aquí ya es el código OPTIMIZADO que viene de la GUI
         tokens, tokens_por_linea = self.lexer.tokenize(codigo)
         
-        self.semantic_analyzer.analyze(tokens_por_linea)
+        self.semantic_analyzer.analyze(tokens_por_linea) # <--- AQUÍ SE LLENA LA TABLA
         errores = self.error_handler.deduplicate_errors()
         
         salida_ejecucion = []
@@ -87,10 +85,12 @@ class Compilador:
              codigo_ensamblador = self.assembler_generator.generate(lista_de_triplos)
              
         info_adicional = {
-            # ... (otros)
+            "tabla_simbolos": self.symbol_table.get_tabla_final(), # <--- ¡ESTA LÍNEA FALTABA O ESTABA MAL!
             "lista_triplos": lista_de_triplos,
-            "codigo_ensamblador": codigo_ensamblador # <--- Nuevo dato
+            "salida_ejecucion": salida_ejecucion,
+            "codigo_ensamblador": codigo_ensamblador 
         }
+        
         return errores, tokens, info_adicional
 
 

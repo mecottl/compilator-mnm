@@ -1,16 +1,9 @@
-# text_optimizer.py
-# Módulo para optimizar el código fuente (mnm).
-
 import re
 
 # Regex para encontrar asignaciones
 ASSIGNMENT_REGEX = re.compile(r"^\s*(mnm[A-Za-z0-9_]+)\s*=\s*(.*?);?\s*$")
 VAR_REGEX = re.compile(r"(mnm[A-Za-z0-9_]+)")
-# Regex para encontrar operaciones matemáticas simples
-MATH_REGEX = re.compile(r"^\s*(\d+(\.\d+)?)\s*([\+\-\*\/])\s*(\d+(\.\d+)?)\s*$")
-
-# Regex para multiplicación binaria simple A * B
-BINARY_MULT_REGEX = re.compile(r"^([a-zA-Z0-9_.]+)\s*(\*)\s*([a-zA-Z0-9_.]+)$")
+# (Eliminado MATH_REGEX porque no calcularemos)
 
 OPTIMIZED_PREFIX = "//OPTIMIZADO: "
 
@@ -26,15 +19,12 @@ class TextOptimizer:
 
     def _normalize(self, expr: str) -> str:
         """
-        Normaliza la expresión ordenando términos y factores.
-        Ej: "mnmB - 20 + mnmA * 5" -> "+5*mnmA+mnmB-20"
+        Normaliza la expresión ordenando términos y factores para detectar conmutatividad.
         """
         expr = expr.strip()
         
         # 1. Quitar paréntesis externos innecesarios: (A + B) -> A + B
         while expr.startswith('(') and expr.endswith(')'):
-            # Chequeo simple: asegurar que los paréntesis se corresponden
-            # (Esto evita romper cosas como "(A) + (B)")
             depth = 0
             is_wrapped = True
             for i, char in enumerate(expr[:-1]):
@@ -43,13 +33,12 @@ class TextOptimizer:
                 if depth == 0 and i > 0: 
                     is_wrapped = False
                     break
-            
             if is_wrapped:
                 expr = expr[1:-1].strip()
             else:
                 break
 
-        # 2. Si es cadena o tiene división (no conmutativa), no tocar
+        # 2. Si es cadena o tiene división, no tocar
         if any(c in expr for c in ['"', "'", '/']):
             return expr.replace(" ", "")
         
@@ -58,33 +47,26 @@ class TextOptimizer:
         if not (expr_clean.startswith('+') or expr_clean.startswith('-')):
             expr_clean = "+" + expr_clean
             
-        # 4. Separar en TÉRMINOS de suma/resta
-        # Regex: (+ o -) seguido de (cualquier cosa que no sea + o -)
-        # Esto funciona incluso con paréntesis internos si no hay signos fuera de ellos
-        # Ej: +A+(B*C)
+        # 4. Separar en TÉRMINOS
         terms = re.findall(r'[+-][^+-]+', expr_clean)
         
-        # Si la suma de longitudes no coincide, algo salió mal con el regex
-        # (ej: paréntesis complejos), así que abortamos la normalización avanzada
         if len("".join(terms)) != len(expr_clean):
             return expr.replace(" ", "")
 
         normalized_terms = []
         for term in terms:
-            sign = term[0] # + o -
-            content = term[1:] # mnmA*5
+            sign = term[0] 
+            content = term[1:] 
             
-            # 5. Separar en FACTORES de multiplicación (si existen)
-            # Ej: "mnmA*5" -> ["mnmA", "5"]
+            # 5. Separar en FACTORES
             if '*' in content and '(' not in content:
                 factors = content.split('*')
-                factors.sort() # Ordenar factores: "5*mnmA"
+                factors.sort() 
                 content = "*".join(factors)
             
             normalized_terms.append(sign + content)
             
         # 6. Ordenar los términos completos
-        # Ej: ["+5*mnmA", "+mnmB", "-20"] -> ["+5*mnmA", "+mnmB", "-20"] (orden alfa)
         normalized_terms.sort()
         
         return "".join(normalized_terms)
@@ -103,25 +85,7 @@ class TextOptimizer:
                 result.append(propagated_part)
         return "".join(result)
 
-    def _fold_constants(self, expression: str) -> str:
-        match = MATH_REGEX.match(expression)
-        if match:
-            try:
-                num1 = float(match.group(1))
-                op = match.group(3)
-                num2 = float(match.group(4))
-                result = 0
-                if op == '+': result = num1 + num2
-                elif op == '-': result = num1 - num2
-                elif op == '*': result = num1 * num2
-                elif op == '/': result = num1 / num2 if num2 != 0 else 0
-                
-                if result.is_integer():
-                    return str(int(result))
-                return str(result)
-            except:
-                return expression
-        return expression
+    # --- FUNCIÓN ELIMINADA: _fold_constants (No calculamos nada) ---
 
     def _invalidate_expressions(self, var_name: str):
         if var_name in self.variable_to_expressions:
@@ -165,7 +129,7 @@ class TextOptimizer:
             
             if not target_var:
                 line_propagated = self._propagate_values(line)
-                line_propagated = self._fold_constants(line_propagated)
+                # line_propagated = self._fold_constants(line_propagated) # <--- DESACTIVADO
                 
                 self.optimized_lines.append(line_propagated)
                 self.line_map[optimized_line_index] = original_line_index
@@ -178,15 +142,15 @@ class TextOptimizer:
 
             # --- PROCESO DE OPTIMIZACIÓN ---
             expression = self._propagate_values(raw_expr)
-            expression = self._fold_constants(expression)
+            # expression = self._fold_constants(expression) # <--- DESACTIVADO: No resolver 100-2
+            
             expr_normalized = self._normalize(expression)
             self._invalidate_expressions(target_var)
 
             if expr_normalized in self.known_expressions:
                 original_var = self.known_expressions[expr_normalized]
                 
-                # Optimización: Reemplazar por copia
-                # NO generamos línea de asignación, solo registramos la copia
+                # Generar línea roja (borrada)
                 self.optimized_lines.append(f"{OPTIMIZED_PREFIX}{line.strip()}")
                 self.line_map[optimized_line_index] = original_line_index
                 optimized_line_index += 1

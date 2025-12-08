@@ -37,12 +37,7 @@ TOKEN_PATTERN = re.compile(
     r'[!&|])'                    # Operadores lógicos de un caracter
 )
 
-# ===== SÍMBOLOS VÁLIDOS =====
-# <--- ¡MODIFICADO! ---
-# Añadimos todos los nuevos operadores para que _classify_token() los reconozca
 VALID_SYMBOLS = {
-    # Originales
     "=", ";", "+", "-", "/", "*", "(", ")", ",", "[", "]", "{", "}", ":", "%",
-    # Nuevos (Lógicos y Relacionales)
     "||", "&&", "==", "!=", "<=", ">=", "<", ">", "!"
 }

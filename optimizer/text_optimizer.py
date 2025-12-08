@@ -1,9 +1,12 @@
+# optimizer/text_optimizer.py
+# Módulo para optimizar el código fuente (mnm).
+# VERSIÓN: Con aislamiento de ámbito para ciclos FOR (Scopes).
+
 import re
 
 # Regex para encontrar asignaciones
 ASSIGNMENT_REGEX = re.compile(r"^\s*(mnm[A-Za-z0-9_]+)\s*=\s*(.*?);?\s*$")
 VAR_REGEX = re.compile(r"(mnm[A-Za-z0-9_]+)")
-# (Eliminado MATH_REGEX porque no calcularemos)
 
 OPTIMIZED_PREFIX = "//OPTIMIZADO: "
 
@@ -12,18 +15,17 @@ class TextOptimizer:
         self.original_lines = source_code.splitlines()
         self.optimized_lines = []
         
+        # Diccionarios de conocimiento
         self.known_expressions = {} 
         self.variable_to_expressions = {}
         self.copies = {}
         self.line_map = {}
 
     def _normalize(self, expr: str) -> str:
-        """
-        Normaliza la expresión ordenando términos y factores para detectar conmutatividad.
-        """
+        """Normaliza la expresión para detectar conmutatividad."""
         expr = expr.strip()
         
-        # 1. Quitar paréntesis externos innecesarios: (A + B) -> A + B
+        # 1. Quitar paréntesis externos
         while expr.startswith('(') and expr.endswith(')'):
             depth = 0
             is_wrapped = True
@@ -42,7 +44,7 @@ class TextOptimizer:
         if any(c in expr for c in ['"', "'", '/']):
             return expr.replace(" ", "")
         
-        # 3. Limpiar espacios y asegurar signo inicial
+        # 3. Limpiar espacios
         expr_clean = expr.replace(" ", "")
         if not (expr_clean.startswith('+') or expr_clean.startswith('-')):
             expr_clean = "+" + expr_clean
@@ -66,7 +68,7 @@ class TextOptimizer:
             
             normalized_terms.append(sign + content)
             
-        # 6. Ordenar los términos completos
+        # 6. Ordenar términos
         normalized_terms.sort()
         
         return "".join(normalized_terms)
@@ -85,8 +87,6 @@ class TextOptimizer:
                 result.append(propagated_part)
         return "".join(result)
 
-    # --- FUNCIÓN ELIMINADA: _fold_constants (No calculamos nada) ---
-
     def _invalidate_expressions(self, var_name: str):
         if var_name in self.variable_to_expressions:
             expressions_to_remove = self.variable_to_expressions[var_name]
@@ -102,16 +102,36 @@ class TextOptimizer:
             if source_var == var_name:
                 del self.copies[copy_var]
 
-    def optimize(self) -> tuple[str, dict]:
-        self.optimized_lines = []
+    def _invalidate_all(self):
+        """Reinicia la memoria del optimizador (Cambio de Ámbito)."""
         self.known_expressions.clear()
         self.variable_to_expressions.clear()
         self.copies.clear()
+
+    def optimize(self) -> tuple[str, dict]:
+        self.optimized_lines = []
+        self._invalidate_all()
         self.line_map = {}
         
         optimized_line_index = 1 
 
         for original_line_index, line in enumerate(self.original_lines, 1):
+            clean_line = line.strip()
+
+            # --- REGLA DE SEGURIDAD DE ÁMBITO (SCOPES) ---
+            
+            # 1. Entrada al Ciclo: Olvidar lo de afuera
+            # (Detectamos 'for' y apertura de bloque '{')
+            if "for" in clean_line and "{" in clean_line:
+                self._invalidate_all()
+
+            # 2. Salida del Ciclo: Olvidar lo de adentro
+            # (Detectamos el cierre de bloque '}')
+            if clean_line == "}":
+                self._invalidate_all()
+
+            # ---------------------------------------------
+
             match = ASSIGNMENT_REGEX.match(line)
             match_decl = re.match(r"^\s*(\\[a-z]+)\s+(mnm[A-Za-z0-9_]+)\s*=\s*(.*?);?\s*$", line)
             
@@ -129,7 +149,6 @@ class TextOptimizer:
             
             if not target_var:
                 line_propagated = self._propagate_values(line)
-                # line_propagated = self._fold_constants(line_propagated) # <--- DESACTIVADO
                 
                 self.optimized_lines.append(line_propagated)
                 self.line_map[optimized_line_index] = original_line_index
@@ -142,15 +161,16 @@ class TextOptimizer:
 
             # --- PROCESO DE OPTIMIZACIÓN ---
             expression = self._propagate_values(raw_expr)
-            # expression = self._fold_constants(expression) # <--- DESACTIVADO: No resolver 100-2
+            # Math folding desactivado
             
             expr_normalized = self._normalize(expression)
+            
             self._invalidate_expressions(target_var)
 
             if expr_normalized in self.known_expressions:
+                # OPTIMIZACIÓN: Expresión repetida en el ámbito actual
                 original_var = self.known_expressions[expr_normalized]
                 
-                # Generar línea roja (borrada)
                 self.optimized_lines.append(f"{OPTIMIZED_PREFIX}{line.strip()}")
                 self.line_map[optimized_line_index] = original_line_index
                 optimized_line_index += 1
@@ -158,7 +178,7 @@ class TextOptimizer:
                 self.copies[target_var] = original_var
 
             else:
-                # Cálculo Nuevo
+                # NUEVO CONOCIMIENTO (Válido solo en el ámbito actual)
                 new_line = f"{prefix}{target_var} = {expression};"
                 
                 self.optimized_lines.append(new_line)
